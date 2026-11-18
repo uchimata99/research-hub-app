@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>מרכז המחקר</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1f2f45">
+<link rel="icon" href="icon-192.png">
+<style>
+  :root{
+    --bg:#f6f5f2; --card:#ffffff; --ink:#1f2328; --muted:#6b7078; --line:#e3e1dc;
+    --accent:#2f5d8a; --accent-soft:#e6eef6; --ok:#2e7d4f; --ok-soft:#e5f3ea;
+    --warn:#a36b00; --warn-soft:#fbf1dc; --bad:#9b2c2c; --bad-soft:#f8e4e4;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Segoe UI",Arial,"Noto Sans Hebrew",sans-serif;background:var(--bg);color:var(--ink);font-size:15px}
+  header{background:#1f2f45;color:#fff;padding:12px 20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+  header h1{font-size:19px;margin:0;font-weight:600}
+  header .meta{font-size:13px;opacity:.8}
+  nav{display:flex;gap:4px;flex-wrap:wrap}
+  nav button{background:transparent;border:0;color:#cfd8e3;padding:8px 14px;border-radius:8px;font-size:15px;cursor:pointer}
+  nav button.on{background:#ffffff1f;color:#fff;font-weight:600}
+  main{max-width:1280px;margin:0 auto;padding:20px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .grow{flex:1}
+  h2{font-size:18px;margin:0 0 12px}
+  h3{font-size:16px;margin:16px 0 8px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:right;padding:8px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:13px;background:#faf9f7;position:sticky;top:0}
+  tr.click{cursor:pointer} tr.click:hover{background:#f3f6fa}
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+  .pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:var(--bad-soft);color:var(--bad)}
+  .pill.gray{background:#eee;color:#555}
+  button,.btn{text-decoration:none;display:inline-block;font:inherit;background:var(--accent);color:#fff;border:0;border-radius:8px;padding:7px 14px;cursor:pointer}
+  button.sec{background:#fff;color:var(--accent);border:1px solid var(--accent)}
+  button.ghost{background:transparent;color:var(--muted);padding:4px 8px;white-space:nowrap}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  input,select,textarea{font:inherit;padding:7px 9px;border:1px solid #cfccc5;border-radius:8px;background:#fff}
+  textarea{width:100%;min-height:70px}
+  label.f{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+  .muted{color:var(--muted);font-size:13px}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .stat b{display:block;font-size:24px}
+  .stages{display:grid;grid-template-columns:repeat(9,1fr);gap:4px;margin:10px 0 4px}
+  .stg{font-size:12px;text-align:center;padding:8px 2px;border-radius:6px;background:#eee;color:#666;line-height:1.25}
+  .stg.done{background:var(--ok-soft);color:var(--ok)} .stg.cur{background:var(--accent);color:#fff;font-weight:600}
+  .mini{display:inline-flex;gap:2px;vertical-align:middle} .mini i{width:9px;height:9px;border-radius:2px;background:#ddd;display:inline-block}
+  .mini i.d{background:#8cc7a1} .mini i.c{background:var(--accent)}
+  .ltr{direction:ltr;unicode-bidi:isolate;font-family:Consolas,monospace;font-size:13px}
+  .drop{border:2px dashed #b9c6d4;border-radius:12px;padding:26px;text-align:center;background:#fbfcfe}
+  .drop.over{background:var(--accent-soft)}
+  .check{display:flex;gap:8px;align-items:flex-start;padding:5px 0}
+  .check input{margin-top:3px}
+  pre.code{direction:ltr;text-align:left;background:#1f2328;color:#e6edf3;padding:10px 12px;border-radius:8px;overflow:auto;margin:6px 0;font-size:13px}
+  .cmd{display:flex;gap:8px;align-items:center;margin:4px 0}
+  .cmd pre{flex:1;margin:0}
+  .modal-bg{position:fixed;inset:0;background:#0007;display:flex;align-items:flex-start;justify-content:center;padding:30px 12px;overflow:auto;z-index:20}
+  .modal{background:#fff;border-radius:14px;max-width:980px;width:100%;padding:20px}
+  .md h1{font-size:20px}.md h2{font-size:17px}.md table{margin:8px 0}
+  .bar{height:8px;border-radius:4px;background:#eee;overflow:hidden;width:90px;display:inline-block;vertical-align:middle}
+  .bar i{display:block;height:100%;background:var(--accent)}
+  .chip{background:var(--accent-soft);color:var(--accent);border:1px solid transparent;border-radius:8px;padding:4px 10px;font-size:13px;line-height:1.35;text-align:right;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chip:hover{border-color:var(--accent)}
+  .terms{display:block}
+  .term{display:block;width:fit-content;margin-top:3px;background:#f1f0ec;color:#333;border-radius:6px;padding:1px 7px;font-weight:400}
+  .hidden{display:none}
+  .toast{position:fixed;bottom:18px;left:18px;background:#1f2f45;color:#fff;padding:10px 16px;border-radius:10px;z-index:30}
+  .center{text-align:center;padding:50px 20px}
+  pre.log{direction:ltr;text-align:left;background:#111;color:#cfe;padding:10px;border-radius:8px;max-height:280px;overflow:auto;font-size:12px;white-space:pre-wrap}
+  /* חלון צר: כל שורה בטבלה הופכת לכרטיס, ושם העמודה מופיע ליד כל ערך */
+  @media (max-width:900px){
+    main{padding:12px}
+    .card{padding:12px}
+    .stats{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+    .stages{grid-template-columns:repeat(3,1fr)}
+    table.stack thead{display:none}
+    table.stack,table.stack tbody,table.stack tr,table.stack td{display:block;width:100%}
+    table.stack tr{border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-bottom:10px;background:var(--card)}
+    table.stack td{border:0;padding:4px 0;display:grid;grid-template-columns:84px minmax(0,1fr);column-gap:10px;align-items:baseline;overflow-wrap:break-word}
+    table.stack td>*{grid-column:2;justify-self:start}
+    table.stack td::before{content:attr(data-label);color:var(--muted);font-size:12px;grid-column:1;grid-row:1 / span 9}
+    table.stack td[data-label=""]{grid-template-columns:minmax(0,1fr)}
+    table.stack td[data-label=""]>*{grid-column:1}
+    table.stack td[data-label=""]::before{display:none}
+    table.stack td.empty{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>מרכז המחקר</h1>
+  <nav id="nav"></nav>
+  <span class="grow"></span>
+  <span class="meta" id="eng"></span>
+  <span class="meta" id="meta"></span>
+</header>
+<main id="app"><div class="center">טוען…</div></main>
+
+<script>
+"use strict";
+/* ============ אחסון: גישה לתיקייה ============ */
+const DB_NAME="research-hub", STORE="h";
+function idb(){return new Promise((res,rej)=>{const r=indexedDB.open(DB_NAME,1);r.onupgradeneeded=()=>r.result.createObjectStore(STORE);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
+async function idbGet(k){const d=await idb();return new Promise(r=>{const q=d.transaction(STORE).objectStore(STORE).get(k);q.onsuccess=()=>r(q.result);q.onerror=()=>r(null);});}
+async function idbSet(k,v){const d=await idb();return new Promise(r=>{const t=d.transaction(STORE,"readwrite");t.objectStore(STORE).put(v,k);t.oncomplete=()=>r();});}
+
+let ROOT=null;
+/* כשהלוח נפתח דרך המנוע, המנוע קורא וכותב את הקבצים. אחרת: גישת הדפדפן לתיקייה */
+const ENG=!!window.RUNNER_TOKEN&&/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(location.origin);
+async function eng(ep,path,opt={}){
+  const r=await fetch(`/fs/${ep}?path=${encodeURIComponent(path)}`,{cache:"no-store",...opt,headers:{"X-Token":window.RUNNER_TOKEN,...(opt.headers||{})}});
+  if(r.status===403) throw new Error("המנוע הופעל מחדש מאז שהדף נפתח. צריך לרענן את הדף.");
+  if(!r.ok){let m=r.status;try{m=(await r.json()).error||m;}catch(e){} const err=new Error(String(m));err.status=r.status;throw err;}
+  return r;
+}
+async function readBuf(path){ if(ENG) return (await eng("read",path)).arrayBuffer(); return (await (await fileAt(path)).getFile()).arrayBuffer(); }
+async function dirAt(path,create=false){
+  let d=ROOT; if(!path) return d;
+  for(const part of path.split("/").filter(Boolean)) d=await d.getDirectoryHandle(part,{create});
+  return d;
+}
+async function fileAt(path,create=false){
+  const parts=path.split("/"); const name=parts.pop();
+  const d=await dirAt(parts.join("/"),create);
+  return d.getFileHandle(name,{create});
+}
+async function exists(path){try{if(ENG){await eng("read",path);return true;}await fileAt(path);return true;}catch(e){return false;}}
+async function readText(path){return new TextDecoder("utf-8").decode(await readBuf(path));}
+async function readJSON(path,fallback){try{return JSON.parse(await readText(path));}catch(e){if(fallback!==undefined)return fallback;throw e;}}
+async function writeText(path,text){await writeBlob(path,new Blob([text]));}
+async function writeJSON(path,obj){await writeText(path,JSON.stringify(obj,null,2)+"\n");}
+async function writeBlob(path,blob){
+  if(ENG){await eng("write",path,{method:"POST",body:blob});return;}
+  const h=await fileAt(path,true);const w=await h.createWritable();await w.write(blob);await w.close();
+}
+async function listEntries(path){
+  if(ENG) return (await (await eng("list",path)).json());
+  const out=[];const d=await dirAt(path);
+  for await(const [n,h] of d.entries()){ if(h.kind==="file"){const f=await h.getFile();out.push({name:n,kind:"file",size:f.size,mtime:f.lastModified});} else out.push({name:n,kind:"directory"}); }
+  return out;
+}
+async function listDirs(path){return (await listEntries(path)).filter(e=>e.kind==="directory").map(e=>e.name).sort();}
+
+/* ============ עזרים ============ */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const today=()=>new Date().toISOString().slice(0,10);
+const nowStamp=()=>{const d=new Date(),p=n=>String(n).padStart(2,"0");return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;};
+const daysSince=d=>d?Math.floor((Date.now()-new Date(d.slice(0,10)).getTime())/864e5):null;
+function toast(msg){const t=document.createElement("div");t.className="toast";t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2600);}
+async function sha256(buf){const h=await crypto.subtle.digest("SHA-256",buf);return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,"0")).join("");}
+function copy(txt){navigator.clipboard.writeText(txt).then(()=>toast("הועתק"));}
+const ltr=s=>`<span class="ltr">${esc(s)}</span>`;
+/* כלל העיצוב: אין אותיות לועזיות בתוך משפט עברי. מונחים לועזיים יוצאים מהמשפט, וכל אחד מוצג בשורה משלו */
+function heb(s){
+  s=String(s??""); if(!/[A-Za-z]/.test(s)) return esc(s);
+  if(!/[֐-׿]/.test(s)) return ltr(s);
+  const terms=[];
+  let prose=s.replace(/[A-Za-z][\w.\-\/\\:+@#']*(?:\s+[A-Za-z0-9][\w.\-\/\\:+@#']*)*/g,m=>{const t=m.replace(/[.,;:)]+$/,"");if(!terms.includes(t))terms.push(t);return m.slice(t.length);});
+  prose=prose.replace(/\(\s*\)/g,"").replace(/\s+([.,;:])/g,"$1").replace(/\s{2,}/g," ").trim();
+  return esc(prose)+`<span class="terms">${terms.map(t=>`<span class="ltr term">${esc(t)}</span>`).join("")}</span>`;
+}
+
+/* פענוח טבלת ערכים מופרדי פסיקים, כולל מירכאות */
+function parseCSV(text){
+  const rows=[];let row=[],f="",q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){f+='"';i++;} else q=false; } else f+=c; }
+    else if(c==='"') q=true;
+    else if(c===","){row.push(f);f="";}
+    else if(c==="\n"){row.push(f.replace(/\r$/,""));rows.push(row);row=[];f="";}
+    else f+=c;
+  }
+  if(f!==""||row.length){row.push(f.replace(/\r$/,""));rows.push(row);}
+  return rows.filter(r=>r.length>1||r[0]!=="");
+}
+/* תאריך הורדה מתוך שם הקובץ: patients20261118_0912.csv */
+function exportDateFromName(name){
+  // patients-2026-11-17_09-46.csv  or  patients20261118_0912.csv
+  const m=String(name).match(/(\d{4})-?(\d{2})-?(\d{2})(?:[_ T-]+(\d{2})[-:]?(\d{2}))?/);
+  if(!m) return null;
+  return `${m[1]}-${m[2]}-${m[3]}`+(m[4]?` ${m[4]}:${m[5]}`:"");
+}
+
+/* ============ מצב ============ */
+const S={stages:[],statuses:{},journals:[],papers:[],tasks:[],log:[],catalog:null,instruments:[],refs:[],tab:"morning"};
+const TABS=[["morning","לוח בוקר"],["papers","מאמרים"],["data","נתונים"],["tasks","משימות"],["library","ספרייה"],["claude","קלוד"]];
+
+async function loadAll(){
+  const st=await readJSON("config/stages.json");
+  S.stages=st.stages; S.statuses=st.statuses; S.workTypes=st.work_types;
+  S.journals=(await readJSON("config/journals.json",{journals:[]})).journals;
+  S.papers=[];
+  for(const id of await listDirs("papers")){
+    const p=await readJSON(`papers/${id}/paper.json`,null);
+    if(p) S.papers.push(p);
+  }
+  S.tasks=(await readJSON("tasks/tasks.json",{tasks:[]})).tasks;
+  S.log=await readJSON("exports/log.json",[]);
+  S.catalog=await readJSON("library/lutz/catalog.json",null);
+  S.instruments=(await readJSON("library/instruments/instruments.json",{instruments:[]})).instruments;
+  S.refs=(await readJSON("library/refs/links.json",{items:[]})).items;
+  S.links=await readJSON("config/links.json",{});
+}
+const stageOf=n=>S.stages.find(s=>s.n===n)||{name:"—",work:"כללי",must:[],nice:[]};
+const paperById=id=>S.papers.find(p=>p.id===id);
+const latestExport=()=>S.log.length?S.log[S.log.length-1]:null;
+async function savePaper(p){p.updated_at=today();await writeJSON(`papers/${p.id}/paper.json`,p);}
+async function saveTasks(){await writeJSON("tasks/tasks.json",{tasks:S.tasks});}
+async function saveLog(){await writeJSON("exports/log.json",S.log);}
+function addHistory(p,event){(p.history=p.history||[]).push({at:nowStamp(),event});}
+
+/* ============ פתיחה ============ */
+async function boot(){
+  if(ENG){ RUN.url=location.origin; RUN.token=window.RUNNER_TOKEN; return start(); }
+  if(!window.showDirectoryPicker){
+    $("#app").innerHTML=`<div class="card center"><h2>הדפדפן הזה לא תומך בגישה לתיקיות</h2><p>פתח את הקובץ בכרום או באדג׳.</p></div>`;return;
+  }
+  const h=await idbGet("root");
+  if(h){
+    $("#app").innerHTML=`<div class="card center"><h2>להתחבר לתיקיית המחקר</h2>
+      <p class="muted">התיקייה שנבחרה בפעם הקודמת:</p><p>${ltr(h.name)}</p>
+      <div class="row" style="justify-content:center"><button id="reconnect">התחבר</button><button class="sec" id="pick">בחר תיקייה אחרת</button></div></div>`;
+    $("#reconnect").onclick=async()=>{ if(await h.requestPermission({mode:"readwrite"})==="granted"){ROOT=h;start();} };
+  } else {
+    $("#app").innerHTML=`<div class="card center"><h2>ברוך הבא</h2>
+      <p>בחר את תיקיית המערכת בדרייב. עושים את זה פעם אחת בכל מחשב.</p>
+      <p class="muted">שם התיקייה:</p><p>${ltr("research-hub")}</p>
+      <button id="pick">בחר תיקייה</button></div>`;
+  }
+  $("#pick").onclick=async()=>{
+    try{ const d=await window.showDirectoryPicker({mode:"readwrite"});
+      ROOT=d; if(!(await exists("config/stages.json"))){toast("זו לא תיקיית המערכת: חסר קובץ השלבים");ROOT=null;return;}
+      await idbSet("root",d); start();
+    }catch(e){}
+  };
+}
+async function start(){
+  try{ await loadAll(); }catch(e){ $("#app").innerHTML=`<div class="card"><h2>שגיאה בקריאת התיקייה</h2><pre class="code">${esc(e.message)}</pre></div>`; return; }
+  renderNav(); render(); runnerCheck(); setInterval(runnerCheck,30000);
+}
+function renderNav(){
+  $("#nav").innerHTML=TABS.map(([k,l])=>`<button data-t="${k}" class="${S.tab===k?"on":""}">${l}</button>`).join("");
+  $("#nav").querySelectorAll("button").forEach(b=>b.onclick=()=>{S.tab=b.dataset.t;renderNav();render();});
+  const le=latestExport();
+  $("#meta").textContent=le?`ייצוא אחרון: ${le.export_date||le.uploaded_at.slice(0,10)} · לפני ${daysSince(le.uploaded_at)} ימים`:"עוד לא נקלט ייצוא";
+}
+function render(){
+  ({morning:renderMorning,papers:renderPapers,data:renderData,tasks:renderTasks,library:renderLibrary,claude:renderClaude}[S.tab])();
+}
+/* מסמן כל טבלה עם כותרות כ"נערמת", ומצמיד לכל תא את שם העמודה שלו (לחלון צר) */
+function stackTables(root){
+  root.querySelectorAll("table:not(.stack)").forEach(t=>{
+    const heads=[...t.querySelectorAll("thead th")].map(th=>th.textContent.trim()); if(!heads.length) return;
+    t.classList.add("stack");
+    t.querySelectorAll("tbody tr").forEach(tr=>[...tr.children].forEach((td,i)=>{
+      td.dataset.label=heads[i]||""; if(!td.textContent.trim()&&!td.querySelector("button,input,select,a,i")) td.classList.add("empty");
+    }));
+  });
+}
+new MutationObserver(()=>stackTables(document.body)).observe(document.body,{childList:true,subtree:true});
+
+/* ============ לוח בוקר ============ */
+function morningItems(){
+  const items=[]; const le=latestExport();
+  for(const p of S.papers){
+    if(p.status!=="active") continue;
+    const st=stageOf(p.stage);
+    const fresh = p.snapshot && le && le.id!==p.snapshot.export_id && p.stage<=3;
+    items.push({kind:"next",type:st.work,text:p.next_step||"להגדיר צעד הבא",paper:p,pr:p.priority||3,age:daysSince(p.updated_at),
+      extra:(p.missing||[]).filter(Boolean),flag:fresh?"יש ייצוא חדש יותר מהתמונה הקפואה":""});
+    if(p.stage>=2) for(const a of (p.analyses||[])) if(a.status==="open"||a.status==="running")
+      items.push({kind:"analysis",type:"ניתוח",text:a.name,paper:p,pr:(p.priority||3)-0.5,age:daysSince(p.updated_at),aid:a.id,extra:[]});
+  }
+  for(const t of S.tasks) if(t.status==="open")
+    items.push({kind:"task",type:t.type,text:t.title,paper:paperById(t.paper),pr:t.priority||3,age:daysSince(t.created_at),tid:t.id,extra:t.note?[t.note]:[]});
+  items.sort((a,b)=>b.pr-a.pr||(b.age||0)-(a.age||0));
+  return items;
+}
+function renderMorning(){
+  const items=morningItems(); const types=["הכל",...new Set(items.map(i=>i.type))];
+  const f=S.morningFilter||"הכל";
+  const shown=items.filter(i=>f==="הכל"||i.type===f);
+  const le=latestExport();
+  const active=S.papers.filter(p=>p.status==="active");
+  const byWork=t=>items.filter(i=>i.type===t).length;
+  $("#app").innerHTML=`
+  <div class="stats">
+    <div class="stat"><span class="muted">מאמרים פעילים</span><b>${active.length}</b></div>
+    <div class="stat"><span class="muted">כתיבה</span><b>${byWork("כתיבה")}</b></div>
+    <div class="stat"><span class="muted">ניתוחים פתוחים</span><b>${byWork("ניתוח")}</b></div>
+    <div class="stat"><span class="muted">משימות למרפאה</span><b>${byWork("מרפאה")}</b></div>
+    <div class="stat"><span class="muted">ימים מאז הייצוא האחרון</span><b>${le?daysSince(le.uploaded_at):"—"}</b></div>
+  </div>
+  <div class="card">
+    <div class="row"><h2 class="grow">מה עושים היום</h2>
+      <select id="mf">${types.map(t=>`<option ${t===f?"selected":""}>${t}</option>`).join("")}</select></div>
+    <table><thead><tr><th>עדיפות</th><th>סוג</th><th>פעולה</th><th>מאמר</th><th>שלב</th><th>ימים</th><th></th></tr></thead><tbody>
+    ${shown.map((i,ix)=>`<tr>
+      <td>${prBadge(i.pr)}</td>
+      <td><span class="pill ${i.type==="מרפאה"?"warn":i.type==="ניתוח"?"":i.type==="כתיבה"?"ok":"gray"}">${esc(i.type)}</span></td>
+      <td><b>${heb(i.text)}</b>${i.extra.length?`<div class="muted">חסר: ${i.extra.map(heb).join(" · ")}</div>`:""}${i.flag?`<div><span class="pill warn">${heb(i.flag)}</span></div>`:""}</td>
+      <td>${i.paper?paperChip(i.paper):"—"}</td>
+      <td>${i.paper?miniStages(i.paper.stage):""}</td>
+      <td>${i.age??""}</td>
+      <td><button class="ghost" data-done="${ix}" title="סמן כבוצע">✓ בוצע</button></td></tr>`).join("")}
+    </tbody></table>
+    ${shown.length?"":`<p class="muted">אין פריטים.</p>`}
+  </div>`;
+  $("#mf").onchange=e=>{S.morningFilter=e.target.value;renderMorning();};
+  bindOpen();
+  document.querySelectorAll("[data-done]").forEach(b=>b.onclick=async()=>{
+    const i=shown[+b.dataset.done];
+    if(i.kind==="task"){const t=S.tasks.find(x=>x.id===i.tid);t.status="done";t.done_at=today();await saveTasks();}
+    else if(i.kind==="analysis"){const a=i.paper.analyses.find(x=>x.id===i.aid);a.status="done";addHistory(i.paper,`ניתוח הושלם: ${a.name}`);await savePaper(i.paper);}
+    else { const n=prompt("מה הצעד הבא במאמר?",""); if(n===null) return; addHistory(i.paper,`בוצע: ${i.paper.next_step}`); i.paper.next_step=n; await savePaper(i.paper);}
+    toast("נשמר"); renderMorning();
+  });
+}
+const short=t=>t.length>48?t.slice(0,46)+"…":t;
+/* כפתור מאמר: שם קצר, הכותרת המלאה בריחוף */
+const paperChip=p=>`<button type="button" class="chip" data-open="${esc(p.id)}" title="${esc(p.title)}">${esc(p.short||(p.title.length>34?p.title.slice(0,32)+"…":p.title))}</button>`;
+function prBadge(pr){const n=Math.round(pr);return `<span class="pill ${n>=5?"bad":n>=4?"warn":"gray"}">${n}</span>`;}
+function miniStages(n){return `<span class="mini" title="שלב ${n}: ${esc(stageOf(n).name)}">${S.stages.map(s=>`<i class="${s.n<n?"d":s.n===n?"c":""}"></i>`).join("")}</span>`;}
+function bindOpen(){document.querySelectorAll("[data-open]").forEach(a=>a.onclick=e=>{e.preventDefault();openPaper(a.dataset.open);});}
+
+/* ============ מאמרים ============ */
+function renderPapers(){
+  const showAll=S.showAllPapers;
+  const list=S.papers.filter(p=>showAll||p.status==="active"||p.status==="paused").sort((a,b)=>(b.priority||0)-(a.priority||0)||b.stage-a.stage);
+  $("#app").innerHTML=`<div class="card">
+    <div class="row"><h2 class="grow">טבלת המאמרים</h2>
+      <label class="muted"><input type="checkbox" id="all" ${showAll?"checked":""}> להציג גם שבוטלו או התקבלו</label>
+      <button id="newp">מאמר חדש</button></div>
+    <table><thead><tr><th>מאמר</th><th>שלב</th><th>מצב</th><th>צעד הבא</th><th>מה חסר</th><th>על איזה נתונים נשען</th><th>טיוטה</th><th>עודכן</th></tr></thead><tbody>
+    ${list.map(p=>`<tr class="click" data-open="${p.id}">
+      <td><b>${esc(p.title)}</b><div class="muted">${({review:"סקירה",external:"מחקר משותף, נתונים חיצוניים"})[p.kind]||"מחקר אמפירי על נתוני המרפאה"}${p.target_journal?` · כתב עת מיועד:`:""}</div>${p.target_journal?`<div>${ltr(journalName(p.target_journal))}</div>`:""}</td>
+      <td>${miniStages(p.stage)}<div class="muted">${p.stage}. ${esc(stageOf(p.stage).name)}</div></td>
+      <td>${statusPill(p.status)}</td>
+      <td>${heb(p.next_step)}</td>
+      <td>${(p.missing||[]).map(m=>`<div>• ${heb(m)}</div>`).join("")}</td>
+      <td>${p.snapshot?`<div>ייצוא מתאריך ${esc(p.snapshot.export_date||"?")}</div><div class="muted">הוקפא ${esc(p.snapshot.frozen_at.slice(0,10))}</div>`:p.kind!=="empirical"?`<span class="muted">לא רלוונטי</span>`:`<span class="pill warn">לא הוקפא</span>`}</td>
+      <td>${p.draft_url?(/^https?:/.test(p.draft_url)?`<a href="${esc(p.draft_url)}" target="_blank" onclick="event.stopPropagation()">פתח</a>`:`<a href="#" data-local="${esc(p.draft_url)}">פתח</a>`):`<span class="muted">—</span>`}</td>
+      <td class="muted" style="white-space:nowrap">${esc(p.updated_at)}</td></tr>`).join("")}
+    </tbody></table></div>`;
+  $("#all").onchange=e=>{S.showAllPapers=e.target.checked;renderPapers();};
+  $("#newp").onclick=newPaper;
+  document.querySelectorAll("[data-local]").forEach(a=>a.onclick=e=>{e.preventDefault();e.stopPropagation();openLocal(a.dataset.local).catch(()=>toast("הקובץ לא נמצא בתיקייה"));});
+  bindOpen();
+}
+const journalName=id=>(S.journals.find(j=>j.id===id)||{name:id}).name;
+function statusPill(s){const cls={active:"",paused:"warn",cancelled:"bad",accepted:"ok"}[s]||"gray";return `<span class="pill ${cls}">${esc(S.statuses[s]||s)}</span>`;}
+async function newPaper(){
+  const title=prompt("כותרת המאמר (בעברית או באנגלית):"); if(!title) return;
+  let id=prompt("מזהה קצר לתיקייה, באותיות לטיניות קטנות ומקפים בלבד:",""); if(!id) return;
+  id=id.toLowerCase().replace(/[^a-z0-9-]/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,"");
+  if(paperById(id)){toast("המזהה כבר קיים");return;}
+  const p={id,title,kind:"empirical",stage:1,status:"active",priority:3,next_step:"לנסח את שאלת המחקר",missing:[],draft_url:"",target_journal:"",coauthors:[],snapshot:null,snapshots:[],analyses:[],gates:{},history:[{at:nowStamp(),event:"נוצר במערכת"}],notes:"",updated_at:today()};
+  await writeJSON(`papers/${id}/paper.json`,p);
+  for(const sub of ["R","outputs","snapshot"]) await writeText(`papers/${id}/${sub}/.keep`,"");
+  S.papers.push(p); toast("נוצר"); openPaper(id);
+}
+
+/* ---- מסך מאמר ---- */
+function openPaper(id){
+  const p=paperById(id); if(!p) return;
+  const st=stageOf(p.stage); const g=(p.gates||{})[p.stage]||{};
+  const auto={};
+  if(p.stage===2) auto["must-0"]=!!p.snapshot;
+  const checked=k=>auto[k]!==undefined?auto[k]:!!g[k];
+  const allMust=st.must.every((_,i)=>checked("must-"+i));
+  const bg=document.createElement("div"); bg.className="modal-bg";
+  bg.innerHTML=`<div class="modal">
+    <div class="row"><h2 class="grow">${esc(p.title)}</h2><button class="ghost" id="x">סגור ✕</button></div>
+    <div class="stages">${S.stages.map(s=>`<div class="stg ${s.n<p.stage?"done":s.n===p.stage?"cur":""}">${s.n}<br>${esc(s.name)}</div>`).join("")}</div>
+    <p class="muted">${esc(st.desc||"")}</p>
+
+    <div class="row" style="align-items:flex-start">
+      <div class="card grow" style="min-width:300px">
+        <h3>שער היציאה משלב ${p.stage}: ${esc(st.name)}</h3>
+        <div class="muted">חובה — בלי כל אלה אי אפשר להתקדם:</div>
+        ${st.must.map((m,i)=>`<label class="check"><input type="checkbox" data-g="must-${i}" ${checked("must-"+i)?"checked":""} ${auto["must-"+i]!==undefined?"disabled":""}> <span>${heb(m)}${auto["must-"+i]!==undefined?` <span class="pill gray">נבדק אוטומטית</span>`:""}</span></label>`).join("")}
+        ${st.nice.length?`<div class="muted" style="margin-top:8px">רצוי:</div>${st.nice.map((m,i)=>`<label class="check"><input type="checkbox" data-g="nice-${i}" ${g["nice-"+i]?"checked":""}> <span>${heb(m)}</span></label>`).join("")}`:""}
+        <div class="row" style="margin-top:10px">
+          <button id="adv" ${allMust&&p.stage<9?"":"disabled"}>מעבר לשלב הבא</button>
+          <button class="sec" id="back" ${p.stage>1?"":"disabled"}>חזרה לשלב הקודם</button>
+          <select id="status">${Object.entries(S.statuses).map(([k,v])=>`<option value="${k}" ${p.status===k?"selected":""}>${v}</option>`).join("")}</select>
+        </div>
+      </div>
+
+      <div class="card grow" style="min-width:300px">
+        <h3>פרטים</h3>
+        <label class="f">צעד הבא</label><input id="f_next" style="width:100%" value="${esc(p.next_step)}">
+        <label class="f">מה חסר (שורה לכל פריט)</label><textarea id="f_missing">${esc((p.missing||[]).join("\n"))}</textarea>
+        <label class="f">הטיוטה הנוכחית: קישור, או נתיב לקובץ וורד בתיקיית המאמר</label><input id="f_draft" style="width:100%;direction:ltr" value="${esc(p.draft_url)}">
+        <div class="row">
+          <div><label class="f">עדיפות (1 נמוכה – 5 עליונה)</label><select id="f_pr">${[1,2,3,4,5].map(n=>`<option ${p.priority===n?"selected":""}>${n}</option>`).join("")}</select></div>
+          <div class="grow"><label class="f">כתב עת מיועד</label><select id="f_j" style="width:100%"><option value="">—</option>${S.journals.map(j=>`<option value="${j.id}" ${p.target_journal===j.id?"selected":""}>${esc(j.name)}</option>`).join("")}</select></div>
+        </div>
+        <label class="f">שותפים (מופרדים בפסיק)</label><input id="f_co" style="width:100%" value="${esc((p.coauthors||[]).join(", "))}">
+        <label class="f">הערות</label><textarea id="f_notes">${esc(p.notes)}</textarea>
+        <button id="save" style="margin-top:8px">שמור</button>
+      </div>
+    </div>
+
+    ${p.kind==="empirical"?`<div class="card">
+      <h3>הנתונים שהמאמר נשען עליהם</h3>
+      ${p.snapshot?`<p>תמונה קפואה ${ltr(p.snapshot.id)} · ייצוא מתאריך <b>${esc(p.snapshot.export_date||"?")}</b> · הוקפאה ${esc(p.snapshot.frozen_at)}</p>
+        <p class="muted">קובץ:</p><p>${ltr("papers/"+p.id+"/snapshot/"+p.snapshot.file)}</p>
+        <p class="muted">טביעת אצבע:</p><p>${ltr(p.snapshot.sha256)}</p>`:`<p class="muted">עוד לא הוקפא ייצוא למאמר הזה.</p>`}
+      <div class="row"><select id="exp">${S.log.slice().reverse().map(e=>`<option value="${e.id}">${esc(e.export_date||e.uploaded_at)} — ${esc(e.original_name)}</option>`).join("")}</select>
+        <button class="sec" id="freeze" ${S.log.length?"":"disabled"}>${p.snapshot?"הקפאה חדשה (מחליפה)":"הקפא ייצוא למאמר"}</button></div>
+      ${(p.snapshots||[]).length>1?`<p class="muted">תמונות קודמות: ${p.snapshots.slice(0,-1).map(s=>ltr(s.id)).join(" ")}</p>`:""}
+    </div>`:""}
+
+    ${p.kind==="empirical"?`<div class="card" id="runcard"></div>`:""}
+    <div class="card">
+      <h3>ניתוחים</h3>
+      <table><thead><tr><th>ניתוח</th><th>מצב</th><th>הערה</th></tr></thead><tbody>
+      ${(p.analyses||[]).map(a=>`<tr><td>${heb(a.name)}</td><td><select data-an="${a.id}">${[["open","פתוח"],["running","רץ"],["done","הושלם"],["verified","אומת"]].map(([k,v])=>`<option value="${k}" ${a.status===k?"selected":""}>${v}</option>`).join("")}</select></td><td class="muted">${heb(a.note||"")}</td></tr>`).join("")}
+      </tbody></table>
+      <div class="row" style="margin-top:8px"><input id="newan" class="grow" placeholder="ניתוח חדש"><button class="sec" id="addan">הוסף</button></div>
+    </div>
+
+    <div class="card"><h3>היסטוריה</h3>
+      ${(p.history||[]).slice().reverse().slice(0,30).map(h=>`<div><span class="muted">${esc(h.at)}</span> · ${esc(h.event)}</div>`).join("")}
+    </div>
+    <p class="muted">תיקיית המאמר:</p><p>${ltr("papers/"+p.id+"/")}</p>
+  </div>`;
+  document.body.appendChild(bg);
+  const close=()=>{bg.remove();render();renderNav();};
+  bg.querySelector("#x").onclick=close;
+  bg.onclick=e=>{if(e.target===bg)close();};
+  bg.querySelectorAll("[data-g]").forEach(cb=>cb.onchange=async()=>{
+    p.gates=p.gates||{}; p.gates[p.stage]=p.gates[p.stage]||{}; p.gates[p.stage][cb.dataset.g]=cb.checked;
+    await savePaper(p); bg.remove(); openPaper(p.id);
+  });
+  bg.querySelector("#adv").onclick=async()=>{
+    const by=prompt("מי מאשר את המעבר? (שם)",""); if(by===null) return;
+    addHistory(p,`שער ${p.stage} עבר (${st.name}) — אישר/ה: ${by||"לא צוין"}`);
+    p.stage++; p.next_step=`להתחיל: ${stageOf(p.stage).name}`; await savePaper(p); bg.remove(); openPaper(p.id);
+  };
+  bg.querySelector("#back").onclick=async()=>{
+    const why=prompt("למה חוזרים לשלב הקודם?",""); if(why===null) return;
+    addHistory(p,`חזרה משלב ${p.stage} לשלב ${p.stage-1}: ${why}`); p.stage--; await savePaper(p); bg.remove(); openPaper(p.id);
+  };
+  bg.querySelector("#status").onchange=async e=>{addHistory(p,`מצב שונה ל: ${S.statuses[e.target.value]}`);p.status=e.target.value;await savePaper(p);toast("נשמר");};
+  bg.querySelector("#save").onclick=async()=>{
+    p.next_step=$("#f_next").value.trim(); p.missing=$("#f_missing").value.split("\n").map(s=>s.trim()).filter(Boolean);
+    p.draft_url=$("#f_draft").value.trim(); p.priority=+$("#f_pr").value; p.target_journal=$("#f_j").value;
+    p.coauthors=$("#f_co").value.split(",").map(s=>s.trim()).filter(Boolean); p.notes=$("#f_notes").value;
+    await savePaper(p); toast("נשמר");
+  };
+  bg.querySelectorAll("[data-an]").forEach(s=>s.onchange=async()=>{const a=p.analyses.find(x=>x.id===s.dataset.an);a.status=s.value;addHistory(p,`ניתוח "${a.name}": ${s.options[s.selectedIndex].text}`);await savePaper(p);toast("נשמר");});
+  bg.querySelector("#addan").onclick=async()=>{const v=$("#newan").value.trim();if(!v)return;p.analyses=p.analyses||[];p.analyses.push({id:"a"+Date.now().toString(36),name:v,status:"open",note:""});await savePaper(p);bg.remove();openPaper(p.id);};
+  const rc=bg.querySelector("#runcard"); if(rc) fillRunCard(p,rc);
+  const fr=bg.querySelector("#freeze");
+  if(fr) fr.onclick=()=>freezeForPaper(p,$("#exp").value,bg);
+}
+
+/* ---- הקפאה ---- */
+async function freezeForPaper(p,exportId,bg){
+  const e=S.log.find(x=>x.id===exportId); if(!e) return;
+  if(p.snapshot && !confirm("למאמר כבר יש תמונה קפואה. הקפאה חדשה תשנה את בסיס הנתונים של המאמר, והקודמת תישמר. להמשיך?")) return;
+  try{
+    const buf=await readBuf("exports/archive/"+e.stored_as); const h=await sha256(buf);
+    if(h!==e.sha256){alert("טביעת האצבע של הקובץ בארכיון לא תואמת ליומן. הקובץ שונה אחרי הקליטה. לא הוקפא.");return;}
+    const n=(p.snapshots||[]).length+1; const sid=`${p.id}-s${n}`;
+    await writeBlob(`papers/${p.id}/snapshot/${e.stored_as}`,new Blob([buf]));
+    const snap={id:sid,export_id:e.id,export_date:e.export_date,file:e.stored_as,sha256:h,rows:e.rows,frozen_at:nowStamp()};
+    await writeJSON(`papers/${p.id}/snapshot/snapshot.json`,snap);
+    p.snapshots=p.snapshots||[]; p.snapshots.push(snap); p.snapshot=snap;
+    addHistory(p,`הוקפא ייצוא מתאריך ${e.export_date||"?"} (${sid})`);
+    e.used_by=[...new Set([...(e.used_by||[]),p.id])]; await saveLog();
+    await savePaper(p); toast("הוקפא"); bg.remove(); openPaper(p.id);
+  }catch(err){alert("שגיאה בהקפאה: "+err.message);}
+}
+
+/* ============ נתונים ============ */
+function renderData(){
+  $("#app").innerHTML=`<div class="card">
+    <h2>קליטת ייצוא חדש</h2>
+    <div class="drop" id="drop">גרור לכאן את קובץ הייצוא שהורדת היום, או <button class="sec" id="pickf">בחר קובץ</button>
+      <input type="file" id="file" class="hidden" accept=".csv,.xlsx,.xls,.txt">
+      <div class="muted" style="margin-top:8px">הקובץ נשמר בארכיון בלי שינוי, עם טביעת אצבע ותאריך. אחר כך קלוד מסכם מה השתנה.</div></div>
+    <div id="ingest"></div>
+  </div>
+  <div class="card"><div class="row"><h2 class="grow">בדיקת שלמות</h2><button class="sec" id="verify">הרץ בדיקה</button></div>
+    <p class="muted">בודקת שכל קובץ בארכיון תואם ליומן, ושכל תמונה קפואה תואמת למקור שלה.</p><div id="vbox"></div></div>
+  <div class="card"><h2>יומן הקליטות</h2>
+    <table><thead><tr><th>נקלט</th><th>תאריך הורדה</th><th>קובץ</th><th>שורות</th><th>מטופלים</th><th>שינוי מהקודם</th><th>מה זה משנה לעבודה</th><th>בשימוש במאמרים</th></tr></thead><tbody>
+    ${S.log.slice().reverse().map(e=>`<tr>
+      <td class="muted">${esc(e.uploaded_at)}</td><td><b>${esc(e.export_date||"—")}</b></td>
+      <td>${ltr(e.original_name)}<div class="muted">${ltr(e.sha256.slice(0,12))}</div></td>
+      <td>${e.rows??"—"}</td><td>${e.patients??"—"}</td>
+      <td>${e.delta?`שורות ${sign(e.delta.rows)} · מטופלים ${sign(e.delta.patients)}`:"—"}</td>
+      <td>${heb(e.note||"")}${e.claude_summary?`<div class="muted">קלוד: ${heb(e.claude_summary)}</div>`:`<div><span class="pill warn">ממתין לסיכום של קלוד</span></div>`}</td>
+      <td>${(e.used_by||[]).map(id=>paperChip(paperById(id)||{id,title:id})).join(" ")||"—"}</td></tr>`).join("")}
+    </tbody></table>${S.log.length?"":`<p class="muted">עוד לא נקלטו קבצים.</p>`}</div>`;
+  $("#verify").onclick=()=>runJob("R/verify.R","",$("#vbox"));
+  const drop=$("#drop"), inp=$("#file");
+  $("#pickf").onclick=()=>inp.click();
+  inp.onchange=()=>inp.files[0]&&ingest(inp.files[0]);
+  drop.ondragover=e=>{e.preventDefault();drop.classList.add("over");};
+  drop.ondragleave=()=>drop.classList.remove("over");
+  drop.ondrop=e=>{e.preventDefault();drop.classList.remove("over");if(e.dataTransfer.files[0]) ingest(e.dataTransfer.files[0]);};
+  bindOpen();
+}
+const sign=n=>n==null?"?":(n>0?"+":"")+n;
+async function ingest(file){
+  const buf=await file.arrayBuffer(); const h=await sha256(buf);
+  const dup=S.log.find(e=>e.sha256===h);
+  if(dup){alert(`הקובץ הזה כבר נקלט ב-${dup.uploaded_at} (אותה טביעת אצבע). לא נקלט שוב.`);return;}
+  let rows=null,cols=null,patients=null,idcol=null,therapists=null,intakeBlock=null;
+  if(/\.(csv|txt)$/i.test(file.name)){
+    const text=new TextDecoder("utf-8").decode(buf).replace(/^﻿/,"");
+    const t=parseCSV(text); if(t.length){cols=t[0].length;rows=t.length-1;
+      const hdr=t[0].map(x=>x.toLowerCase());
+      let ix=hdr.findIndex(x=>/uuid/.test(x)); if(ix<0) ix=hdr.findIndex(x=>/patient|client|מטופל/.test(x));
+      if(ix>=0){idcol=t[0][ix];patients=new Set(t.slice(1).map(r=>r[ix]).filter(Boolean)).size;}
+      const cm=hdr.findIndex(x=>x.trim()==="case manager");
+      if(cm>=0) therapists=new Set(t.slice(1).map(r=>(r[cm]||"").trim()).filter(Boolean)).size;
+      intakeBlock=t[0].some(h=>/^Intake questionnaire /i.test(h.trim()));
+    }
+  }
+  let stored=file.name;
+  if(await exists("exports/archive/"+stored)){const dot=stored.lastIndexOf(".");stored=stored.slice(0,dot)+"__"+Date.now()+stored.slice(dot);}
+  const prev=latestExport();
+  const entry={id:"x"+Date.now().toString(36),uploaded_at:nowStamp(),export_date:exportDateFromName(file.name),original_name:file.name,stored_as:stored,
+    sha256:h,bytes:buf.byteLength,rows,cols,patients,therapists,intake_block:intakeBlock,id_column:idcol,
+    delta:prev?{rows:(rows!=null&&prev.rows!=null)?rows-prev.rows:null,patients:(patients!=null&&prev.patients!=null)?patients-prev.patients:null,cols:(cols!=null&&prev.cols!=null)?cols-prev.cols:null}:null,
+    note:"",claude_summary:"",used_by:[]};
+  $("#ingest").innerHTML=`<div class="card" style="margin-top:12px">
+    <p>הקובץ ${ltr(file.name)}</p>
+    <p>תאריך הורדה מזוהה: <b>${esc(entry.export_date||"לא זוהה")}</b> · שורות: ${rows??"?"} · עמודות: ${cols??"?"} · מטופלים: ${patients??"?"}</p>
+    ${idcol?`<p class="muted">עמודת המזהה שזוהתה:</p><p>${ltr(idcol)}</p>`:""}
+    ${therapists!=null?`<p>מטפלים בקובץ: ${therapists} (השמות לא נשמרים ביומן)</p>`:""}
+    ${intakeBlock===false?`<p><span class="pill bad">אזהרה: בקובץ אין את גוש שאלוני הקליטה. כנראה זה סוג הייצוא החלקי. מומלץ להוריד את הייצוא המלא.</span></p>`:intakeBlock?`<p><span class="pill ok">גוש שאלוני הקליטה קיים</span></p>`:""}
+    ${entry.delta?`<p>לעומת הייצוא הקודם: שורות ${sign(entry.delta.rows)}, מטופלים ${sign(entry.delta.patients)}, עמודות ${sign(entry.delta.cols)}</p>`:""}
+    <label class="f">מה אתה יודע על הייצוא הזה, ואיך הוא אמור להשפיע על העבודה? (לא חובה)</label>
+    <textarea id="enote"></textarea>
+    <button id="esave" style="margin-top:8px">שמור בארכיון וביומן</button></div>`;
+  $("#esave").onclick=async()=>{
+    entry.note=$("#enote").value.trim();
+    await writeBlob("exports/archive/"+stored,new Blob([buf]));
+    S.log.push(entry); await saveLog();
+    toast("נקלט ונשמר"); renderNav(); renderData();
+  };
+}
+
+/* ============ משימות ============ */
+function renderTasks(){
+  const showDone=S.showDone;
+  const list=S.tasks.filter(t=>showDone||t.status==="open").sort((a,b)=>(b.priority||0)-(a.priority||0));
+  $("#app").innerHTML=`<div class="card">
+    <h2>משימה חדשה</h2>
+    <div class="row">
+      <input id="tt" class="grow" placeholder="מה צריך לעשות">
+      <select id="ty">${S.workTypes.map(w=>`<option ${w==="מרפאה"?"selected":""}>${w}</option>`).join("")}</select>
+      <select id="tp"><option value="">ללא מאמר</option>${S.papers.filter(p=>p.status==="active").map(p=>`<option value="${p.id}">${esc(short(p.title))}</option>`).join("")}</select>
+      <select id="tpr" title="עדיפות">${[1,2,3,4,5].map(n=>`<option ${n===3?"selected":""}>${n}</option>`).join("")}</select>
+      <button id="tadd">הוסף</button>
+    </div>
+    <input id="tnote" style="width:100%;margin-top:8px" placeholder="הערה או הרעיון שממנו זה עלה (לא חובה)">
+  </div>
+  <div class="card"><div class="row"><h2 class="grow">משימות</h2><label class="muted"><input type="checkbox" id="sd" ${showDone?"checked":""}> להציג גם שבוצעו</label></div>
+    <table><thead><tr><th>עדיפות</th><th>סוג</th><th>משימה</th><th>מאמר</th><th>נוצרה</th><th></th></tr></thead><tbody>
+    ${list.map(t=>`<tr><td>${prBadge(t.priority)}</td><td><span class="pill ${t.type==="מרפאה"?"warn":"gray"}">${esc(t.type)}</span></td>
+      <td>${t.status==="done"?`<s>${heb(t.title)}</s>`:`<b>${heb(t.title)}</b>`}${t.note?`<div class="muted">${heb(t.note)}</div>`:""}</td>
+      <td>${t.paper?paperChip(paperById(t.paper)||{id:t.paper,title:t.paper}):"—"}</td>
+      <td class="muted">${esc(t.created_at)}</td>
+      <td>${t.status==="open"?`<button class="ghost" data-td="${t.id}">✓ בוצע</button>`:`<button class="ghost" data-tr="${t.id}">פתח מחדש</button>`}</td></tr>`).join("")}
+    </tbody></table></div>`;
+  $("#sd").onchange=e=>{S.showDone=e.target.checked;renderTasks();};
+  $("#tadd").onclick=async()=>{const title=$("#tt").value.trim();if(!title)return;
+    S.tasks.push({id:"t"+Date.now().toString(36),title,type:$("#ty").value,paper:$("#tp").value,priority:+$("#tpr").value,status:"open",note:$("#tnote").value.trim(),created_at:today(),done_at:null});
+    await saveTasks();toast("נוסף");renderTasks();};
+  document.querySelectorAll("[data-td]").forEach(b=>b.onclick=async()=>{const t=S.tasks.find(x=>x.id===b.dataset.td);t.status="done";t.done_at=today();await saveTasks();renderTasks();});
+  document.querySelectorAll("[data-tr]").forEach(b=>b.onclick=async()=>{const t=S.tasks.find(x=>x.id===b.dataset.tr);t.status="open";t.done_at=null;await saveTasks();renderTasks();});
+  bindOpen();
+}
+
+/* ============ ספרייה ============ */
+function renderLibrary(){
+  const c=S.catalog; const minS=S.minScore||1;
+  const cat=c?c.catalog.filter(x=>x.score>=minS).sort((a,b)=>b.score-a.score):[];
+  const le=latestExport();
+  $("#app").innerHTML=`
+  <div class="card"><h2>מפתח הנתונים ומקרא הציונים</h2>
+    <div class="row"><button class="sec" data-md2="library/data-key.md">מפתח פענוח הייצוא</button>
+      ${S.links.scoring_sheet?`<a class="btn" href="${esc(S.links.scoring_sheet)}" target="_blank">מקרא ציוני השאלונים (הגיליון החי)</a>`:""}
+      ${S.links.paper_registry?`<a class="btn" href="${esc(S.links.paper_registry)}" target="_blank">מאגר המאמרים מנתוני המרפאה</a>`:""}</div>
+  </div>
+  <div class="card"><h2>ספריית השאלונים ומקראות הניקוד</h2>
+    <table><thead><tr><th>שאלון</th><th>קיצור</th><th>מתי</th><th>מקרא ניקוד ומקורות</th><th></th></tr></thead><tbody>
+    ${S.instruments.map(i=>`<tr><td><b>${esc(i.name)}</b></td><td>${ltr(i.code)}</td><td>${esc(i.when)}</td>
+      <td>${i.links.map(l=>`<div><a href="${esc(l.url)}" target="_blank">${ltr(l.label)}</a></div>`).join("")||`<span class="muted">מקומי</span>`}
+        ${i.verified==="partial"?`<span class="pill warn">חלק מהספים ממקור חלש</span>`:""}</td>
+      <td><button class="sec" data-md="${esc(i.page)}">דף השאלון</button></td></tr>`).join("")}
+    </tbody></table></div>
+
+  <div class="card"><div class="row"><h2 class="grow">קטלוג הניתוחים של מעבדת לוץ</h2>
+    <span class="muted">להציג מציון</span><select id="ms">${[1,2,3,4,5].map(n=>`<option ${n===minS?"selected":""}>${n}</option>`).join("")}</select></div>
+    <p class="muted">${c?esc(c.scale):""}${le&&le.patients?` · מספר המטופלים בייצוא האחרון: ${le.patients}`:""}</p>
+    <table><thead><tr><th>ציון</th><th>קו מחקר</th><th>שיטה</th><th>מה צריך</th><th>מינימום</th><th>רעיון למאמר אצלנו</th><th>מקורות</th></tr></thead><tbody>
+    ${cat.map(x=>{const ready=le&&le.patients&&x.threshold_patients!=null?le.patients>=x.threshold_patients:null;
+      return `<tr><td><span class="bar"><i style="width:${x.score*20}%"></i></span> ${x.score}</td>
+      <td><b>${esc(x.line)}</b><div class="muted">${ltr(x.source)}</div></td><td>${esc(x.method)}</td><td>${esc(x.variables)}</td>
+      <td>${esc(x.minimum)}${ready===true?` <span class="pill ok">הסף הושג</span>`:ready===false?` <span class="pill gray">עוד לא</span>`:""}</td>
+      <td>${esc(x.idea)}${x.note?`<div class="muted">${esc(x.note)}</div>`:""}</td>
+      <td>${x.links.map((u,k)=>`<a href="${esc(u)}" target="_blank">[${k+1}]</a>`).join(" ")}</td></tr>`;}).join("")}
+    </tbody></table>
+    ${c?`<p class="muted">דף הפרסומים של המעבדה:</p>${c.lab_pages.map(u=>`<p><a href="${esc(u)}" target="_blank">${ltr("uni-trier.de — publications")}</a></p>`).join("")}`:""}
+    <p class="muted">"הסף הושג" נבדק מול מספר המטופלים בייצוא האחרון בלבד, בלי לבדוק מספר מפגשים. הבדיקה המלאה נעשית אצל קלוד.</p>
+  </div>
+
+  <div class="card"><h2>פרופילי כתבי עת</h2>
+    <table><thead><tr><th>כתב עת</th><th>אורך</th><th>תקציר</th><th>מקורות</th><th>רשימות בדיקה</th><th>אומת</th></tr></thead><tbody>
+    ${S.journals.map(j=>`<tr><td><a href="${esc(j.guidelines_url)}" target="_blank">${ltr(j.name)}</a></td><td>${ltr(j.word_limit||"—")}</td><td>${ltr(j.abstract||"—")}</td><td>${ltr(j.references||"—")}</td><td>${ltr((j.checklists||[]).join("; ")||"—")}</td>
+      <td>${j.verified?`<span class="pill ok">${esc(j.verified_on)}</span>`:`<span class="pill warn">לא אומת</span>`}</td></tr>`).join("")}
+    </tbody></table></div>
+
+  <div class="card"><h2>מאמרים וקישורים נוספים</h2>
+    ${S.refs.map(r=>`<div>• <span class="muted">${esc(r.topic||"")}</span> <a href="${esc(r.url)}" target="_blank">${ltr(r.title)}</a></div>`).join("")}
+    <div class="row" style="margin-top:10px"><input id="rt" class="grow" placeholder="שם"><input id="ru" class="grow" style="direction:ltr" placeholder="https://"><input id="rtop" placeholder="נושא"><button class="sec" id="radd">הוסף</button></div>
+    <p class="muted">מקורות לציטוט במאמר נכנסים רק דרך זוטרו. הרשימה כאן היא לעיון.</p>
+  </div>`;
+  $("#ms").onchange=e=>{S.minScore=+e.target.value;renderLibrary();};
+  document.querySelectorAll("[data-md]").forEach(b=>b.onclick=()=>showMd("library/instruments/"+b.dataset.md));
+  document.querySelectorAll("[data-md2]").forEach(b=>b.onclick=()=>showMd(b.dataset.md2));
+  $("#radd").onclick=async()=>{const t=$("#rt").value.trim(),u=$("#ru").value.trim();if(!t||!u)return;S.refs.push({title:t,url:u,topic:$("#rtop").value.trim()});await writeJSON("library/refs/links.json",{items:S.refs});toast("נוסף");renderLibrary();};
+}
+async function showMd(path){
+  const txt=await readText(path).catch(()=>"# לא נמצא\n");
+  const bg=document.createElement("div");bg.className="modal-bg";
+  bg.innerHTML=`<div class="modal md"><div class="row"><span class="grow"></span><button class="ghost" id="x">סגור ✕</button></div>${md(txt)}<p class="muted">הקובץ:</p><p>${ltr(path)}</p></div>`;
+  document.body.appendChild(bg); bg.querySelector("#x").onclick=()=>bg.remove(); bg.onclick=e=>{if(e.target===bg)bg.remove();};
+}
+function md(src){
+  const lines=src.split("\n");let out="",inCode=false,code=[],inList=false,table=[];
+  const inline=s=>esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/`(.+?)`/g,'<span class="ltr">$1</span>');
+  const flushTable=()=>{if(!table.length)return;const rows=table.filter(r=>!/^\|[\s|:-]+\|$/.test(r));out+="<table>"+rows.map((r,i)=>"<tr>"+r.split("|").slice(1,-1).map(c=>i?`<td>${inline(c.trim())}</td>`:`<th>${inline(c.trim())}</th>`).join("")+"</tr>").join("")+"</table>";table=[];};
+  for(const l of lines){
+    if(l.startsWith("```")){ if(inCode){out+=`<pre class="code">${esc(code.join("\n"))}</pre>`;code=[];inCode=false;} else {if(inList){out+="</ul>";inList=false;}flushTable();inCode=true;} continue; }
+    if(inCode){code.push(l);continue;}
+    if(l.startsWith("|")){table.push(l);continue;} else flushTable();
+    if(/^- /.test(l)){ if(!inList){out+="<ul>";inList=true;} out+=`<li>${inline(l.slice(2))}</li>`; continue; }
+    if(inList){out+="</ul>";inList=false;}
+    const h=l.match(/^(#{1,3}) (.*)/); if(h){out+=`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`;continue;}
+    if(l.trim()) out+=`<p>${inline(l)}</p>`;
+  }
+  if(inList) out+="</ul>"; flushTable(); return out;
+}
+
+/* ============ קלוד ============ */
+const COMMANDS=[
+  ["/morning","סיכום בוקר: מה הכי דחוף היום, מה תקוע, ואילו ניתוחים נפתחו בזכות נתונים חדשים"],
+  ["/ingest","עיבוד הייצוא האחרון: בדיקת טביעת אצבע, מה השתנה, אילו ניתוחים בקטלוג עברו סף, וכתיבת סיכום ליומן"],
+  ["/freeze <paper-id>","הקפאת הייצוא האחרון למאמר, כולל דוח ניקוי ובנייה מחדש מהגולמי"],
+  ["/analyze <paper-id>","הרצת הניתוחים של המאמר על התמונה הקפואה בלבד, שמירת פלטים, והסבר התוצאות בעברית"],
+  ["/gate <paper-id>","בדיקת שער השלב הנוכחי: מה עומד בתנאים, מה חסר, והמלצה אם לעבור"],
+  ["/recommend <paper-id>","המלצה על ניתוחים לפי מבנה הנתונים, הקטלוג של לוץ ומאמרים דומים"],
+  ["/read <file-or-url>","קריאת מאמר או טיוטה: סיכום, מה רלוונטי למאמרים שלנו, והוספה לספרייה"],
+  ["/draft <paper-id> <section>","כתיבת פרק (שיטה, תוצאות, מבוא, דיון) לפי כללי האגודה ותקן הדיווח"],
+  ["/journal <paper-id> <journal-id>","בדיקת המאמר מול פרופיל כתב העת והכנת חבילת הגשה"],
+  ["/reviewers <paper-id>","טבלת הערות סוקרים, תגובות, ומכתב תשובה"],
+  ["/verify","בדיקת שלמות: כל קובץ בארכיון תואם ליומן, וכל תמונה קפואה תואמת למקור"]
+];
+function renderClaude(){
+  $("#app").innerHTML=`<div class="card"><h2>איך עובדים עם קלוד במערכת</h2>
+    <p>פותחים את קלוד קוד, בוחרים את תיקיית המערכת, וכותבים אחת מהפקודות. הכללים של קלוד כתובים בקובץ שבתוך התיקייה, לכן הוא עובד אותו דבר בבית ובמשרד.</p>
+    <p>אחרי שקלוד מסיים, לוחצים כאן על ריענון כדי לראות את השינויים.</p>
+    <button id="reload">ריענון</button></div>
+  <div class="card"><h2>פקודות</h2>
+    ${COMMANDS.map(([c,d])=>`<div style="margin-bottom:10px"><div>${esc(d)}</div><div class="cmd"><pre class="code">${esc(c)}</pre><button class="sec" data-c="${esc(c)}">העתק</button></div></div>`).join("")}
+  </div>
+  <div class="card"><h2>מנוע הניתוח במחשב</h2>
+    <p>${RUN.ok?`מחובר: ${esc(RUN.info&&RUN.info.r_version||"")}`:"כבוי. להפעלה: לחיצה כפולה על הקובץ הבא בתיקיית המערכת. החלון שנפתח צריך להישאר פתוח."}</p>
+    ${RUN.ok?"":`<p>${ltr("start-runner.bat")}</p>`}
+    <button class="sec" id="chk">בדוק שהחבילות נטענות במחשב הזה</button><div id="chkbox"></div></div>
+  <div class="card"><h2>התקנה חד-פעמית בכל מחשב</h2>
+    <p>אחרי התקנת אר, להריץ באר את הקובץ:</p>
+    <div class="cmd"><pre class="code">source("R/00_setup.R")</pre><button class="sec" data-c='source("R/00_setup.R")'>העתק</button></div>
+    <p>או לבקש מקלוד קוד:</p>
+    <div class="cmd"><pre class="code">/setup</pre><button class="sec" data-c="/setup">העתק</button></div>
+  </div>`;
+  document.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>copy(b.dataset.c));
+  $("#reload").onclick=async()=>{await loadAll();renderNav();toast("רוענן");};
+  $("#chk").onclick=()=>runJob("R/check_packages.R","",$("#chkbox"));
+}
+
+/* ============ מנוע הניתוח המקומי ============ */
+const RUN={url:"http://127.0.0.1:8765",token:null,ok:false,info:null};
+/* ניתוחים רצים רק במחשב שמותקן בו אר (בבית). בכל מחשב אחר הלוח עובד בלי הרצה */
+const ENGINE_OFF=`<p><span class="pill gray">הרצת ניתוחים זמינה רק במחשב בבית, כשהמנוע פועל.</span></p><p class="muted">בבית מפעילים את המנוע בלחיצה כפולה על הקובץ:</p><p>${ltr("start-runner.bat")}</p><p class="muted">פלטים שהורצו בבית מופיעים כאן אחרי שהדרייב מסתנכרן.</p>`;
+async function runnerCheck(){
+  if(!ENG){
+    try{const port=(await readText(".runner/port")).trim(); if(port) RUN.url="http://127.0.0.1:"+port;}catch(e){}
+    try{RUN.token=(await readText(".runner/token")).trim();}catch(e){RUN.token=null;}
+  }
+  try{const r=await fetch(RUN.url+"/status",{cache:"no-store"});RUN.ok=r.ok;RUN.info=await r.json();}catch(e){RUN.ok=false;}
+  const el=$("#eng"); if(el) el.innerHTML=RUN.ok?"מנוע הניתוח: מחובר ✓":"מנוע הניתוח: כבוי";
+  return RUN.ok;
+}
+async function runJob(script,paper,box,onDone){
+  if(!(await runnerCheck())){box.innerHTML=ENGINE_OFF;return;}
+  box.innerHTML=`<p class="muted">מריץ…</p><pre class="log"></pre>`;
+  let r;
+  try{r=await fetch(RUN.url+"/run",{method:"POST",headers:{"Content-Type":"application/json","X-Token":RUN.token||""},body:JSON.stringify({script,paper})});}
+  catch(e){box.innerHTML=`<p class="pill bad">אין חיבור למנוע</p>`;return;}
+  const j=await r.json(); if(!j.job){box.innerHTML=`<p><span class="pill bad">המנוע סירב להריץ</span></p><pre class="log">${esc(j.error||"")}</pre>`;return;}
+  const poll=async()=>{
+    const s=await (await fetch(RUN.url+"/job?id="+j.job,{cache:"no-store",headers:{"X-Token":RUN.token||""}})).json();
+    const st={running:"רץ",starting:"מתחיל",done:"הסתיים בהצלחה",failed:"נכשל"}[s.status]||s.status;
+    box.innerHTML=`<p><span class="pill ${s.status==="done"?"ok":s.status==="failed"?"bad":""}">${esc(st)}</span> <span class="muted">${esc(script)}</span></p><pre class="log">${esc(s.log||"")}</pre>`;
+    const lg=box.querySelector("pre"); lg.scrollTop=lg.scrollHeight;
+    if(s.status==="done"||s.status==="failed"){ if(onDone) onDone(s); } else setTimeout(poll,1500);
+  };
+  setTimeout(poll,800);
+}
+async function listFiles(path){let out=[];try{out=(await listEntries(path)).filter(e=>e.kind==="file"&&!e.name.startsWith("."));}catch(e){}return out.sort((a,b)=>a.name.localeCompare(b.name));}
+const MIME={html:"text/html",txt:"text/plain",md:"text/plain",csv:"text/plain",png:"image/png",pdf:"application/pdf",svg:"image/svg+xml"};
+async function openLocal(path){const name=path.split("/").pop(),ext=(name.split(".").pop()||"").toLowerCase();
+  const f=new Blob([await readBuf(path)],{type:(MIME[ext]||"application/octet-stream")+(/^(html|txt|md|csv)$/.test(ext)?";charset=utf-8":"")});
+  const url=URL.createObjectURL(f);const a=document.createElement("a");a.href=url;a.target="_blank";if(!MIME[ext])a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
+async function fillRunCard(p,card){
+  const scripts=(await listFiles(`papers/${p.id}/R`)).filter(f=>/\.R$/.test(f.name));
+  const outs=await listFiles(`papers/${p.id}/outputs`);
+  card.innerHTML=`<h3>הרצת ניתוחים במחשב הזה</h3>
+    ${RUN.ok?`<p class="muted">המנוע מחובר. הקוד רץ במחשב הזה, על התמונה הקפואה בלבד.</p>`:ENGINE_OFF}
+    ${scripts.map(s=>`<div class="cmd"><span class="grow">${ltr(s.name)}</span><button class="sec" data-run="${esc(s.name)}" ${p.snapshot?"":"disabled title='אין תמונה קפואה'"}>הרץ</button></div>`).join("")||`<p class="muted">אין קבצי קוד בתיקיית המאמר.</p>`}
+    ${p.snapshot?"":`<p class="muted">צריך להקפיא ייצוא לפני הרצה.</p>`}
+    <div id="runbox"></div>
+    <h3>פלטים</h3>
+    ${outs.map(o=>`<div class="cmd"><span class="grow">${ltr(o.name)}</span><span class="muted">${new Date(o.mtime).toLocaleString("he-IL")}</span><button class="ghost" data-out="${esc(o.name)}">פתח</button></div>`).join("")||`<p class="muted">עוד אין פלטים.</p>`}`;
+  card.querySelectorAll("[data-run]").forEach(b=>b.onclick=()=>runJob(`papers/${p.id}/R/${b.dataset.run}`,p.id,card.querySelector("#runbox"),async s=>{
+    addHistory(p,`הורץ ${b.dataset.run}: ${s.status==="done"?"הצליח":"נכשל"}`);await savePaper(p);const keep=card.querySelector("#runbox").innerHTML;await fillRunCard(p,card);card.querySelector("#runbox").innerHTML=keep;}));
+  card.querySelectorAll("[data-out]").forEach(b=>b.onclick=()=>openLocal(`papers/${p.id}/outputs/${b.dataset.out}`));
+}
+if("serviceWorker" in navigator && (location.protocol==="https:"||location.hostname==="127.0.0.1"||location.hostname==="localhost")) navigator.serviceWorker.register("sw.js").catch(()=>{});
+
+boot();
+</script>
+</body>
+</html>
