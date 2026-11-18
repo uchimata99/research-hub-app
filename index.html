@@ -83,6 +83,7 @@
   a.lb.claude small{font-weight:400;opacity:.9}
   .lb.ghost-b{background:transparent;color:var(--muted);border:1px solid var(--line)}
   .claude-pill{background:var(--claude);color:#fff;border-radius:999px;padding:2px 10px;margin-inline-start:8px;text-decoration:none;font-weight:600}
+  #demobar{background:#f5c542;color:#3a2c00;text-align:center;font-weight:600;padding:6px 12px;font-size:14px}
   .hidden{display:none}
   .toast{position:fixed;bottom:18px;left:18px;background:#1f2f45;color:#fff;padding:10px 16px;border-radius:10px;z-index:30}
   .center{text-align:center;padding:50px 20px}
@@ -226,6 +227,7 @@ async function loadAll(){
   S.refs=(await readJSON("library/refs/links.json",{items:[]})).items;
   S.links=await readJSON("config/links.json",{});
   S.machines=await readJSON("config/machines.json",{});
+  S.demo=await readJSON("config/demo.json",null);
 }
 const stageOf=n=>S.stages.find(s=>s.n===n)||{name:"—",work:"כללי",must:[],nice:[]};
 const paperById=id=>S.papers.find(p=>p.id===id);
@@ -239,7 +241,7 @@ function addHistory(p,event){(p.history=p.history||[]).push({at:nowStamp(),event
 async function boot(){
   if(ENG){ RUN.url=location.origin; RUN.token=window.RUNNER_TOKEN; return start(); }
   if(!window.showDirectoryPicker){
-    $("#app").innerHTML=`<div class="card center"><h2>הדפדפן הזה לא תומך בגישה לתיקיות</h2><p>פתח את הקובץ בכרום או באדג׳.</p></div>`;return;
+    $("#app").innerHTML=`<div class="card center"><h2>הדפדפן הזה לא תומך בגישה לתיקיות</h2><p>יש לפתוח את הקובץ בכרום או באדג׳.</p></div>`;return;
   }
   const h=await idbGet("root");
   if(h){
@@ -249,7 +251,7 @@ async function boot(){
     $("#reconnect").onclick=async()=>{ if(await h.requestPermission({mode:"readwrite"})==="granted"){ROOT=h;start();} };
   } else {
     $("#app").innerHTML=`<div class="card center"><h2>ברוך הבא</h2>
-      <p>בחר את תיקיית המערכת בדרייב. עושים את זה פעם אחת בכל מחשב.</p>
+      <p>יש לבחור את תיקיית המערכת בדרייב. עושים את זה פעם אחת בכל מחשב.</p>
       <p class="muted">שם התיקייה:</p><p>${ltr("research-hub")}</p>
       <button id="pick">בחר תיקייה</button></div>`;
   }
@@ -265,6 +267,7 @@ async function start(){
   renderNav(); render(); runnerCheck(); setInterval(runnerCheck,30000);
 }
 function renderNav(){
+  if(S.demo&&!document.getElementById("demobar")){const b=document.createElement("div");b.id="demobar";b.textContent="סביבת הדגמה להדרכה · הנתונים מדומים · שום דבר כאן לא משפיע על המערכת האמיתית";document.body.insertBefore(b,document.body.firstChild);}
   $("#nav").innerHTML=TABS.map(([k,l])=>`<button data-t="${k}" class="${S.tab===k?"on":""}">${l}</button>`).join("");
   $("#nav").querySelectorAll("button").forEach(b=>b.onclick=()=>{S.tab=b.dataset.t;renderNav();render();});
   const le=latestExport();
@@ -551,7 +554,7 @@ async function freezeForPaper(p,exportId,bg){
 function renderData(){
   $("#app").innerHTML=`<div class="card">
     <h2>קליטת ייצוא חדש</h2>
-    <div class="drop" id="drop">גרור לכאן את קובץ הייצוא שהורדת היום, או <button class="sec" id="pickf">בחר קובץ</button>
+    <div class="drop" id="drop">אפשר לגרור לכאן את קובץ הייצוא שהורד היום, או <button class="sec" id="pickf">בחר קובץ</button>
       <input type="file" id="file" class="hidden" accept=".csv,.xlsx,.xls,.txt">
       <div class="muted" style="margin-top:8px">הקובץ נשמר בארכיון בלי שינוי, עם טביעת אצבע ותאריך. אחר כך קלוד מסכם מה השתנה.</div></div>
     <div id="ingest"></div>
@@ -608,7 +611,7 @@ async function ingest(file){
     ${therapists!=null?`<p>מטפלים בקובץ: ${therapists} (השמות לא נשמרים ביומן)</p>`:""}
     ${intakeBlock===false?`<p><span class="pill bad">אזהרה: בקובץ אין את גוש שאלוני הקליטה. כנראה זה סוג הייצוא החלקי. מומלץ להוריד את הייצוא המלא.</span></p>`:intakeBlock?`<p><span class="pill ok">גוש שאלוני הקליטה קיים</span></p>`:""}
     ${entry.delta?`<p>לעומת הייצוא הקודם: שורות ${sign(entry.delta.rows)}, מטופלים ${sign(entry.delta.patients)}, עמודות ${sign(entry.delta.cols)}</p>`:""}
-    <label class="f">מה אתה יודע על הייצוא הזה, ואיך הוא אמור להשפיע על העבודה? (לא חובה)</label>
+    <label class="f">מה ידוע על הייצוא הזה, ואיך הוא אמור להשפיע על העבודה? (לא חובה)</label>
     <textarea id="enote"></textarea>
     <button id="esave" style="margin-top:8px">שמור בארכיון וביומן</button></div>`;
   $("#esave").onclick=async()=>{
