@@ -69,6 +69,20 @@
   .term{display:block;width:fit-content;margin-top:3px;background:#f1f0ec;color:#333;border-radius:6px;padding:1px 7px;font-weight:400}
   td .btn,td button{white-space:nowrap}
   details.more summary{cursor:pointer;color:var(--accent);font-size:13px;margin-top:2px}
+  :root{--claude:#D97757}
+  table.papers td.c-title{min-width:220px;max-width:300px}
+  table.papers td.c-stage{width:120px}
+  table.papers td.c-next{min-width:170px}
+  table.papers td.c-missing{min-width:260px}
+  table.papers td.c-data{min-width:140px}
+  table.papers td.c-links{width:132px}
+  .lb{display:block;box-sizing:border-box;width:124px;text-align:center;padding:6px 8px;margin:0 0 6px;border-radius:8px;font:inherit;font-size:13px;line-height:1.3;white-space:nowrap;text-decoration:none;cursor:pointer}
+  a.lb.word{background:var(--accent);color:#fff;border:1px solid var(--accent)}
+  .lb.sec{background:#fff;color:var(--accent);border:1px solid var(--accent)}
+  a.lb.claude{background:var(--claude);color:#fff;border:1px solid var(--claude);font-weight:600}
+  a.lb.claude small{font-weight:400;opacity:.9}
+  .lb.ghost-b{background:transparent;color:var(--muted);border:1px solid var(--line)}
+  .claude-pill{background:var(--claude);color:#fff;border-radius:999px;padding:2px 10px;margin-inline-start:8px;text-decoration:none;font-weight:600}
   .hidden{display:none}
   .toast{position:fixed;bottom:18px;left:18px;background:#1f2f45;color:#fff;padding:10px 16px;border-radius:10px;z-index:30}
   .center{text-align:center;padding:50px 20px}
@@ -343,17 +357,14 @@ function renderPapers(){
     <div class="row"><h2 class="grow">טבלת המאמרים</h2>
       <label class="muted"><input type="checkbox" id="all" ${showAll?"checked":""}> להציג גם שבוטלו או התקבלו</label>
       <button id="newp">מאמר חדש</button></div>
-    <table><thead><tr><th>מאמר</th><th>שלב</th><th>מצב</th><th>צעד הבא</th><th>מה חסר</th><th>על איזה נתונים נשען</th><th>טיוטה</th><th>שיחה ויומן</th><th>עודכן</th></tr></thead><tbody>
+    <table class="papers"><thead><tr><th>מאמר</th><th>שלב ומצב</th><th>צעד הבא</th><th>מה חסר</th><th>על איזה נתונים נשען</th><th>טיוטה ושיחה</th></tr></thead><tbody>
     ${list.map(p=>`<tr class="click" data-open="${p.id}">
-      <td><b>${esc(p.title)}</b><div class="muted">${({review:"סקירה",external:"מחקר משותף, נתונים חיצוניים"})[p.kind]||"מחקר אמפירי על נתוני המרפאה"}${p.target_journal?` · כתב עת מיועד:`:""}</div>${p.target_journal?`<div>${ltr(journalName(p.target_journal))}</div>`:""}</td>
-      <td>${miniStages(p.stage)}<div class="muted">${p.stage}. ${esc(stageOf(p.stage).name)}</div></td>
-      <td>${statusPill(p.status)}</td>
-      <td>${heb(p.next_step)}</td>
-      <td>${missingCell(p)}</td>
-      <td>${dataCell(p)}</td>
-      <td>${draftCell(p)}</td>
-      <td>${sessionCell(p)}</td>
-      <td class="muted" style="white-space:nowrap">${esc(p.updated_at)}</td></tr>`).join("")}
+      <td class="c-title"><b>${esc(p.title)}</b><div class="muted">${({review:"סקירה",external:"מחקר משותף, נתונים חיצוניים"})[p.kind]||"מחקר אמפירי על נתוני המרפאה"}${p.target_journal?` · כתב עת מיועד:`:""}</div>${p.target_journal?`<div>${ltr(journalName(p.target_journal))}</div>`:""}<div class="muted">עודכן ${dmy(p.updated_at)}</div></td>
+      <td class="c-stage">${miniStages(p.stage)}<div class="muted">${p.stage}. ${esc(stageOf(p.stage).name)}</div><div style="margin-top:6px">${statusPill(p.status)}</div></td>
+      <td class="c-next">${heb(p.next_step)}</td>
+      <td class="c-missing">${missingCell(p)}</td>
+      <td class="c-data">${dataCell(p)}</td>
+      <td class="c-links">${draftCell(p)}${sessionCell(p)}</td></tr>`).join("")}
     </tbody></table></div>`;
   $("#all").onchange=e=>{S.showAllPapers=e.target.checked;renderPapers();};
   $("#newp").onclick=newPaper;
@@ -386,17 +397,16 @@ function wordLink(rel){
 function draftCell(p){
   const d=(S.drafts[p.id]||[])[0]; let out="";
   if(d){ const rel=`papers/${p.id}/manuscript/${d.name}`, url=wordLink(rel);
-    out=url?`<a class="btn stop" href="${esc(url)}">פתח בוורד</a>`:`<a href="#" class="stop" data-local="${esc(rel)}">הורד עותק</a>`;
-    out+=`<div class="muted">עודכן ${dmy(new Date(d.mtime).toISOString())}</div>`;
-  } else out=`<div class="muted">אין טיוטה</div><button class="sec stop" data-newdraft="${esc(p.id)}">צור טיוטה</button>`;
-  if(/^https?:/.test(p.draft_url||"")) out+=`<div><a class="stop muted" href="${esc(p.draft_url)}" target="_blank">טיוטה קודמת אצל קלוד</a></div>`;
+    out=url?`<a class="lb word stop" href="${esc(url)}" title="עודכן ${dmy(new Date(d.mtime).toISOString())}">פתח בוורד</a>`:`<a href="#" class="lb sec stop" data-local="${esc(rel)}">הורד עותק</a>`;
+  } else out=`<button class="lb sec stop" data-newdraft="${esc(p.id)}">צור טיוטה</button>`;
   return out;
 }
 /* שיחה עם קלוד לכל מאמר: קישור נפרד לכל מחשב, כי שיחות לא עוברות בין מחשבים. הזיכרון המשותף הוא יומן העבודה */
 function sessionCell(p){
-  const ss=p.sessions||{}; let out=Object.keys(ss).map(k=>`<a class="btn sec stop" href="${esc(ss[k])}">שיחה · ${esc((S.machines[k]||{}).label||k)}</a>`).join(" ");
-  if(!out) out=`<div class="muted">אין שיחה</div>`;
-  if(S.worklogs[p.id]) out+=`<div><button class="ghost stop" data-md2="papers/${esc(p.id)}/worklog.md">יומן עבודה</button></div>`;
+  const ss=p.sessions||{};
+  let out=Object.keys(ss).map(k=>`<a class="lb claude stop" href="${esc(ss[k])}">קלוד<small> · ${esc((S.machines[k]||{}).label||k)}</small></a>`).join("");
+  if(S.worklogs[p.id]) out+=`<button class="lb ghost-b stop" data-md2="papers/${esc(p.id)}/worklog.md">יומן עבודה</button>`;
+  if(/^https?:/.test(p.draft_url||"")) out+=`<a class="stop muted" style="font-size:12px" href="${esc(p.draft_url)}" target="_blank">טיוטה קודמת אצל קלוד</a>`;
   return out;
 }
 async function createDraft(p){
@@ -761,7 +771,7 @@ async function runnerCheck(){
   }
   try{const r=await fetch(RUN.url+"/status",{cache:"no-store"});RUN.ok=r.ok;RUN.info=await r.json();}catch(e){RUN.ok=false;}
   const el=$("#eng"); const m=RUN.ok&&RUN.info&&S.machines?S.machines[RUN.info.machine]:null;
-  if(el) el.innerHTML=(RUN.ok?"מנוע הניתוח: מחובר ✓":"מנוע הניתוח: כבוי")+(m&&m.main_session?` · <a href="${esc(m.main_session)}" style="color:inherit">השיחה הראשית בקלוד</a>`:"");
+  if(el) el.innerHTML=(RUN.ok?"מנוע הניתוח: מחובר ✓":"מנוע הניתוח: כבוי")+(m&&m.main_session?` <a class="claude-pill" href="${esc(m.main_session)}">קלוד · שיחה ראשית</a>`:"");
   return RUN.ok;
 }
 async function runJob(script,paper,box,onDone){
