@@ -67,6 +67,8 @@
   .chip:hover{border-color:var(--accent)}
   .terms{display:block}
   .term{display:block;width:fit-content;margin-top:3px;background:#f1f0ec;color:#333;border-radius:6px;padding:1px 7px;font-weight:400}
+  td .btn,td button{white-space:nowrap}
+  details.more summary{cursor:pointer;color:var(--accent);font-size:13px;margin-top:2px}
   .hidden{display:none}
   .toast{position:fixed;bottom:18px;left:18px;background:#1f2f45;color:#fff;padding:10px 16px;border-radius:10px;z-index:30}
   .center{text-align:center;padding:50px 20px}
@@ -200,12 +202,16 @@ async function loadAll(){
     const p=await readJSON(`papers/${id}/paper.json`,null);
     if(p) S.papers.push(p);
   }
+  S.drafts={}; S.worklogs={};
+  for(const p of S.papers) S.drafts[p.id]=(await listFiles(`papers/${p.id}/manuscript`)).filter(isDraft).sort((a,b)=>b.mtime-a.mtime);
+  for(const p of S.papers) S.worklogs[p.id]=await exists(`papers/${p.id}/worklog.md`);
   S.tasks=(await readJSON("tasks/tasks.json",{tasks:[]})).tasks;
   S.log=await readJSON("exports/log.json",[]);
   S.catalog=await readJSON("library/lutz/catalog.json",null);
   S.instruments=(await readJSON("library/instruments/instruments.json",{instruments:[]})).instruments;
   S.refs=(await readJSON("library/refs/links.json",{items:[]})).items;
   S.links=await readJSON("config/links.json",{});
+  S.machines=await readJSON("config/machines.json",{});
 }
 const stageOf=n=>S.stages.find(s=>s.n===n)||{name:"—",work:"כללי",must:[],nice:[]};
 const paperById=id=>S.papers.find(p=>p.id===id);
@@ -337,21 +343,70 @@ function renderPapers(){
     <div class="row"><h2 class="grow">טבלת המאמרים</h2>
       <label class="muted"><input type="checkbox" id="all" ${showAll?"checked":""}> להציג גם שבוטלו או התקבלו</label>
       <button id="newp">מאמר חדש</button></div>
-    <table><thead><tr><th>מאמר</th><th>שלב</th><th>מצב</th><th>צעד הבא</th><th>מה חסר</th><th>על איזה נתונים נשען</th><th>טיוטה</th><th>עודכן</th></tr></thead><tbody>
+    <table><thead><tr><th>מאמר</th><th>שלב</th><th>מצב</th><th>צעד הבא</th><th>מה חסר</th><th>על איזה נתונים נשען</th><th>טיוטה</th><th>שיחה ויומן</th><th>עודכן</th></tr></thead><tbody>
     ${list.map(p=>`<tr class="click" data-open="${p.id}">
       <td><b>${esc(p.title)}</b><div class="muted">${({review:"סקירה",external:"מחקר משותף, נתונים חיצוניים"})[p.kind]||"מחקר אמפירי על נתוני המרפאה"}${p.target_journal?` · כתב עת מיועד:`:""}</div>${p.target_journal?`<div>${ltr(journalName(p.target_journal))}</div>`:""}</td>
       <td>${miniStages(p.stage)}<div class="muted">${p.stage}. ${esc(stageOf(p.stage).name)}</div></td>
       <td>${statusPill(p.status)}</td>
       <td>${heb(p.next_step)}</td>
-      <td>${(p.missing||[]).map(m=>`<div>• ${heb(m)}</div>`).join("")}</td>
-      <td>${p.snapshot?`<div>ייצוא מתאריך ${esc(p.snapshot.export_date||"?")}</div><div class="muted">הוקפא ${esc(p.snapshot.frozen_at.slice(0,10))}</div>`:p.kind!=="empirical"?`<span class="muted">לא רלוונטי</span>`:`<span class="pill warn">לא הוקפא</span>`}</td>
-      <td>${p.draft_url?(/^https?:/.test(p.draft_url)?`<a href="${esc(p.draft_url)}" target="_blank" onclick="event.stopPropagation()">פתח</a>`:`<a href="#" data-local="${esc(p.draft_url)}">פתח</a>`):`<span class="muted">—</span>`}</td>
+      <td>${missingCell(p)}</td>
+      <td>${dataCell(p)}</td>
+      <td>${draftCell(p)}</td>
+      <td>${sessionCell(p)}</td>
       <td class="muted" style="white-space:nowrap">${esc(p.updated_at)}</td></tr>`).join("")}
     </tbody></table></div>`;
   $("#all").onchange=e=>{S.showAllPapers=e.target.checked;renderPapers();};
   $("#newp").onclick=newPaper;
   document.querySelectorAll("[data-local]").forEach(a=>a.onclick=e=>{e.preventDefault();e.stopPropagation();openLocal(a.dataset.local).catch(()=>toast("הקובץ לא נמצא בתיקייה"));});
+  document.querySelectorAll("#app .stop").forEach(x=>x.addEventListener("click",e=>e.stopPropagation()));
+  document.querySelectorAll("#app [data-md2]").forEach(b=>b.onclick=e=>{e.stopPropagation();showMd(b.dataset.md2);});
+  document.querySelectorAll("[data-newdraft]").forEach(b=>b.onclick=e=>{e.stopPropagation();createDraft(paperById(b.dataset.newdraft));});
   bindOpen();
+}
+/* מה חסר: שני פריטים, והשאר נפתח בלחיצה */
+function missingCell(p){
+  const m=p.missing||[]; const li=x=>`<div>• ${heb(x)}</div>`;
+  if(m.length<=3) return m.map(li).join("");
+  return m.slice(0,2).map(li).join("")+`<details class="stop more"><summary>ועוד ${m.length-2}</summary>${m.slice(2).map(li).join("")}</details>`;
+}
+/* על איזה נתונים המאמר נשען: קפוא, ראשוני או לא רלוונטי */
+const dmy=d=>{const m=String(d||"").match(/(\d{4})-(\d{2})-(\d{2})/);return m?`${+m[3]}.${+m[2]}.${m[1]}`:"?";};
+function dataCell(p){
+  if(p.snapshot) return `<span class="pill ok">קפוא</span><div>ייצוא מ־${dmy(p.snapshot.export_date)}</div><div class="muted">הוקפא ב־${dmy(p.snapshot.frozen_at)}</div>`;
+  if(p.kind&&p.kind!=="empirical") return `<span class="muted">לא רלוונטי</span>`;
+  if(p.data_basis&&p.data_basis.export_date) return `<span class="pill warn">ראשוני, לא קפוא</span><div>ייצוא מ־${dmy(p.data_basis.export_date)}</div>${p.data_basis.note?`<div class="muted">${heb(p.data_basis.note)}</div>`:""}`;
+  return `<span class="pill gray">עוד לא נבחר ייצוא</span>`;
+}
+/* טיוטה: קובץ וורד בתיקיית המאמר, נפתח ישירות בוורד */
+const isDraft=f=>/\.docx$/i.test(f.name)&&!f.name.startsWith("~$");
+function wordLink(rel){
+  const hub=(S.links.hub_path||"").replace(/\\/g,"/").replace(/\/$/,""); if(!hub) return null;
+  return "ms-word:ofe|u|file:///"+(hub+"/"+rel).split("/").map((x,i)=>i===0?x:encodeURIComponent(x)).join("/");
+}
+function draftCell(p){
+  const d=(S.drafts[p.id]||[])[0]; let out="";
+  if(d){ const rel=`papers/${p.id}/manuscript/${d.name}`, url=wordLink(rel);
+    out=url?`<a class="btn stop" href="${esc(url)}">פתח בוורד</a>`:`<a href="#" class="stop" data-local="${esc(rel)}">הורד עותק</a>`;
+    out+=`<div class="muted">עודכן ${dmy(new Date(d.mtime).toISOString())}</div>`;
+  } else out=`<div class="muted">אין טיוטה</div><button class="sec stop" data-newdraft="${esc(p.id)}">צור טיוטה</button>`;
+  if(/^https?:/.test(p.draft_url||"")) out+=`<div><a class="stop muted" href="${esc(p.draft_url)}" target="_blank">טיוטה קודמת אצל קלוד</a></div>`;
+  return out;
+}
+/* שיחה עם קלוד לכל מאמר: קישור נפרד לכל מחשב, כי שיחות לא עוברות בין מחשבים. הזיכרון המשותף הוא יומן העבודה */
+function sessionCell(p){
+  const ss=p.sessions||{}; let out=Object.keys(ss).map(k=>`<a class="btn sec stop" href="${esc(ss[k])}">שיחה · ${esc((S.machines[k]||{}).label||k)}</a>`).join(" ");
+  if(!out) out=`<div class="muted">אין שיחה</div>`;
+  if(S.worklogs[p.id]) out+=`<div><button class="ghost stop" data-md2="papers/${esc(p.id)}/worklog.md">יומן עבודה</button></div>`;
+  return out;
+}
+async function createDraft(p){
+  const name=`${p.id}-draft.docx`, rel=`papers/${p.id}/manuscript/${name}`;
+  try{
+    if(await exists(rel)){toast("כבר יש טיוטה בשם הזה");return;}
+    await writeBlob(rel,new Blob([await readBuf("templates/paper/manuscript/draft-template.docx")]));
+    addHistory(p,"נוצרה טיוטת וורד בתיקיית המאמר"); await savePaper(p);
+    S.drafts[p.id]=(await listFiles(`papers/${p.id}/manuscript`)).filter(isDraft); toast("הטיוטה נוצרה"); renderPapers();
+  }catch(e){alert("לא הצלחתי ליצור טיוטה: "+e.message);}
 }
 const journalName=id=>(S.journals.find(j=>j.id===id)||{name:id}).name;
 function statusPill(s){const cls={active:"",paused:"warn",cancelled:"bad",accepted:"ok"}[s]||"gray";return `<span class="pill ${cls}">${esc(S.statuses[s]||s)}</span>`;}
@@ -363,6 +418,7 @@ async function newPaper(){
   const p={id,title,kind:"empirical",stage:1,status:"active",priority:3,next_step:"לנסח את שאלת המחקר",missing:[],draft_url:"",target_journal:"",coauthors:[],snapshot:null,snapshots:[],analyses:[],gates:{},history:[{at:nowStamp(),event:"נוצר במערכת"}],notes:"",updated_at:today()};
   await writeJSON(`papers/${id}/paper.json`,p);
   for(const sub of ["R","outputs","snapshot"]) await writeText(`papers/${id}/${sub}/.keep`,"");
+  await writeText(`papers/${id}/worklog.md`,`# יומן עבודה — ${title}\n\nכל שיחה על המאמר הזה קוראת את היומן בתחילתה, ומוסיפה רשומה בסופו. הרשומה האחרונה היא הנקודה שבה עצרנו.\n\n## ${today()} · המאמר נוצר\n**הצעד הבא:** ${p.next_step||"להגדיר"}\n`);
   S.papers.push(p); toast("נוצר"); openPaper(id);
 }
 
@@ -704,7 +760,8 @@ async function runnerCheck(){
     try{RUN.token=(await readText(".runner/token")).trim();}catch(e){RUN.token=null;}
   }
   try{const r=await fetch(RUN.url+"/status",{cache:"no-store"});RUN.ok=r.ok;RUN.info=await r.json();}catch(e){RUN.ok=false;}
-  const el=$("#eng"); if(el) el.innerHTML=RUN.ok?"מנוע הניתוח: מחובר ✓":"מנוע הניתוח: כבוי";
+  const el=$("#eng"); const m=RUN.ok&&RUN.info&&S.machines?S.machines[RUN.info.machine]:null;
+  if(el) el.innerHTML=(RUN.ok?"מנוע הניתוח: מחובר ✓":"מנוע הניתוח: כבוי")+(m&&m.main_session?` · <a href="${esc(m.main_session)}" style="color:inherit">השיחה הראשית בקלוד</a>`:"");
   return RUN.ok;
 }
 async function runJob(script,paper,box,onDone){
