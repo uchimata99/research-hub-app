@@ -146,7 +146,8 @@ async function idbSet(k,v){const d=await idb();return new Promise(r=>{const t=d.
 
 let ROOT=null;
 /* כשהלוח נפתח דרך המנוע, המנוע קורא וכותב את הקבצים. אחרת: גישת הדפדפן לתיקייה */
-const ENG=!!window.RUNNER_TOKEN&&/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(location.origin);
+/* רק המנוע מזריק את המפתח לדף, גם כשהוא מוגש מרחוק דרך המנהרה המוגנת (מצב שרת). באתר הציבורי אין מפתח, ולכן בוחרים תיקייה */
+const ENG=!!window.RUNNER_TOKEN&&location.origin!=="null";
 async function eng(ep,path,opt={}){
   const r=await fetch(`/fs/${ep}?path=${encodeURIComponent(path)}`,{cache:"no-store",...opt,headers:{"X-Token":window.RUNNER_TOKEN,...(opt.headers||{})}});
   if(r.status===403) throw new Error("המנוע הופעל מחדש מאז שהדף נפתח. צריך לרענן את הדף.");
@@ -790,8 +791,10 @@ function bubble(m){
   return `<div class="bub cl ${m.status==="failed"?"err":""}"><div class="md">${md(m.text||"")}</div>${chg}${ap}<div class="meta">${esc((m.at||"").slice(11,16))}${m.machine&&S.machines[m.machine]?` · ${esc(S.machines[m.machine].label)}`:""}</div></div>`;
 }
 async function chatApi(path,opt={}){
-  const r=await fetch(RUN.url+path,{cache:"no-store",...opt,headers:{"Content-Type":"application/json","X-Token":RUN.token||"",...(opt.headers||{})}});
-  return r.json();
+  const h={"X-Token":RUN.token||"",...(opt.body?{"Content-Type":"application/json"}:{}),...(opt.headers||{})};
+  const r=await fetch(RUN.url+path,{cache:"no-store",credentials:"same-origin",...opt,headers:h});
+  const t=await r.text();
+  try{ return JSON.parse(t); }catch(e){ throw new Error(`${r.status} ${t.replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim().slice(0,120)}`); }
 }
 async function loadChat(){
   const box=$("#chatlog"); if(!box) return;
@@ -800,7 +803,8 @@ async function loadChat(){
     const ms=r.messages||[];
     box.innerHTML=ms.length?ms.map(bubble).join(""):`<p class="muted">עוד אין שיחה כאן. אפשר לכתוב בקשה, או לבחור אחד הקיצורים.</p>`;
     bindChatButtons(); box.scrollTop=box.scrollHeight;
-  }catch(e){ box.innerHTML=`<p class="pill bad">אין חיבור למנוע</p>`; }
+  }catch(e){ box.innerHTML=`<p class="pill bad">אין חיבור למנוע</p><p class="muted">פרטים לבדיקה: ${ltr(e.message||String(e))}</p><button class="sec" id="chatretry">לנסות שוב</button>`;
+    const b=$("#chatretry"); if(b) b.onclick=loadChat; }
 }
 function bindChatButtons(){
   document.querySelectorAll("#chatlog [data-ok]").forEach(b=>b.onclick=()=>sendChat("אישור: "+b.dataset.ok));
@@ -838,10 +842,11 @@ function bindChat(){
 }
 function openChatFor(id){ S.chatKey=id; S.tab="claude"; document.querySelector(".modal-bg")?.remove(); renderNav(); render(); }
 function renderClaude(){
-  $("#app").innerHTML=askCard()+`<div class="card"><h2>איך עובדים עם קלוד במערכת</h2>
-    <p>פותחים את קלוד קוד, בוחרים את תיקיית המערכת, וכותבים אחת מהפקודות. הכללים של קלוד כתובים בקובץ שבתוך התיקייה, לכן הוא עובד אותו דבר בבית ובמשרד.</p>
-    <p>אחרי שקלוד מסיים, לוחצים כאן על ריענון כדי לראות את השינויים.</p>
-    <button id="reload">ריענון</button></div>
+  /* למשתמש: רק השיחה. כל השאר (פקודות, מנוע, התקנה) בכרטיס מתקפל לתחזוקה */
+  $("#app").innerHTML=askCard()+`<div class="card"><p class="muted">אחרי עבודה ישירה בקלוד קוד, הריענון מציג את השינויים.</p><button id="reload">ריענון</button></div>
+  <details class="card"><summary><b>לתחזוקה: פקודות, מנוע והתקנה</b></summary>
+  <div class="card"><h2>איך עובדים עם קלוד קוד ישירות</h2>
+    <p>פותחים את קלוד קוד, בוחרים את תיקיית המערכת, וכותבים אחת מהפקודות. הכללים של קלוד כתובים בקובץ שבתוך התיקייה, לכן הוא עובד אותו דבר בכל מחשב.</p></div>
   <div class="card"><h2>פקודות</h2>
     ${COMMANDS.map(([c,d])=>`<div style="margin-bottom:10px"><div>${esc(d)}</div><div class="cmd"><pre class="code">${esc(c)}</pre><button class="sec" data-c="${esc(c)}">העתק</button></div></div>`).join("")}
   </div>
@@ -854,7 +859,7 @@ function renderClaude(){
     <div class="cmd"><pre class="code">source("R/00_setup.R")</pre><button class="sec" data-c='source("R/00_setup.R")'>העתק</button></div>
     <p>או לבקש מקלוד קוד:</p>
     <div class="cmd"><pre class="code">/setup</pre><button class="sec" data-c="/setup">העתק</button></div>
-  </div>`;
+  </div></details>`;
   document.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>copy(b.dataset.c));
   $("#reload").onclick=async()=>{await loadAll();renderNav();toast("רוענן");};
   $("#chk").onclick=()=>runJob("R/check_packages.R","",$("#chkbox"));
