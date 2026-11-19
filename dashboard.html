@@ -373,6 +373,13 @@ function miniStages(n){return `<span class="mini" title="שלב ${n}: ${esc(stag
 function bindOpen(){document.querySelectorAll("[data-open]").forEach(a=>a.onclick=e=>{e.preventDefault();openPaper(a.dataset.open);});}
 
 /* ============ מאמרים ============ */
+/* הגשות לכתבי עת: רשימה לכל מאמר, האחרונה היא ההגשה הנוכחית */
+const SUB_ST={under_review:"בבדיקה",revise:"הוחזר לתיקונים",rejected:"נדחה",accepted:"התקבל",withdrawn:"נמשך"};
+function subLine(p){
+  const s=(p.submissions||[]).slice(-1)[0]; if(!s) return "";
+  const cls={accepted:"ok",rejected:"bad",revise:"warn"}[s.status]||"gray";
+  return `<div style="margin-top:6px" class="muted">הוגש ל־</div><div>${ltr(s.journal)}</div><div class="muted">${dmy(s.submitted_at)} <span class="pill ${cls}">${SUB_ST[s.status]||s.status}</span></div>${(p.submissions.length>1)?`<div class="muted">הגשה ${p.submissions.length}</div>`:""}`;
+}
 function renderPapers(){
   const showAll=S.showAllPapers;
   const list=S.papers.filter(p=>showAll||p.status==="active"||p.status==="paused").sort((a,b)=>(b.priority||0)-(a.priority||0)||b.stage-a.stage);
@@ -383,7 +390,7 @@ function renderPapers(){
     <table class="papers"><thead><tr><th>מאמר</th><th>שלב ומצב</th><th>צעד הבא</th><th>מה חסר</th><th>על איזה נתונים נשען</th><th>טיוטה ושיחה</th></tr></thead><tbody>
     ${list.map(p=>`<tr class="click" data-open="${p.id}">
       <td class="c-title"><b>${esc(p.title)}</b><div class="muted">${({review:"סקירה",external:"מחקר משותף, נתונים חיצוניים"})[p.kind]||"מחקר אמפירי על נתוני המרפאה"}${p.target_journal?` · כתב עת מיועד:`:""}</div>${p.target_journal?`<div>${ltr(journalName(p.target_journal))}</div>`:""}<div class="muted">עודכן ${dmy(p.updated_at)}</div></td>
-      <td class="c-stage">${miniStages(p.stage)}<div class="muted">${p.stage}. ${esc(stageOf(p.stage).name)}</div><div style="margin-top:6px">${statusPill(p.status)}</div></td>
+      <td class="c-stage">${miniStages(p.stage)}<div class="muted">${p.stage}. ${esc(stageOf(p.stage).name)}</div><div style="margin-top:6px">${statusPill(p.status)}</div>${subLine(p)}</td>
       <td class="c-next">${heb(p.next_step)}</td>
       <td class="c-missing">${missingCell(p)}</td>
       <td class="c-data">${dataCell(p)}</td>
@@ -448,7 +455,7 @@ async function newPaper(){
   let id=prompt("מזהה קצר לתיקייה, באותיות לטיניות קטנות ומקפים בלבד:",""); if(!id) return;
   id=id.toLowerCase().replace(/[^a-z0-9-]/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,"");
   if(paperById(id)){toast("המזהה כבר קיים");return;}
-  const p={id,title,kind:"empirical",stage:1,status:"active",priority:3,next_step:"לנסח את שאלת המחקר",missing:[],draft_url:"",target_journal:"",coauthors:[],snapshot:null,snapshots:[],analyses:[],gates:{},history:[{at:nowStamp(),event:"נוצר במערכת"}],notes:"",updated_at:today()};
+  const p={id,title,kind:"empirical",stage:1,status:"active",priority:3,next_step:"לנסח את שאלת המחקר",missing:[],draft_url:"",target_journal:"",coauthors:[],snapshot:null,snapshots:[],analyses:[],submissions:[],gates:{},history:[{at:nowStamp(),event:"נוצר במערכת"}],notes:"",updated_at:today()};
   await writeJSON(`papers/${id}/paper.json`,p);
   for(const sub of ["R","outputs","snapshot"]) await writeText(`papers/${id}/${sub}/.keep`,"");
   await writeText(`papers/${id}/worklog.md`,`# יומן עבודה — ${title}\n\nכל שיחה על המאמר הזה קוראת את היומן בתחילתה, ומוסיפה רשומה בסופו. הרשומה האחרונה היא הנקודה שבה עצרנו.\n\n## ${today()} · המאמר נוצר\n**הצעד הבא:** ${p.next_step||"להגדיר"}\n`);
@@ -461,6 +468,9 @@ function openPaper(id){
   const st=stageOf(p.stage); const g=(p.gates||{})[p.stage]||{};
   const auto={};
   if(p.stage===2) auto["must-0"]=!!p.snapshot;
+  { const subs=p.submissions||[], last=subs.slice(-1)[0];
+    if(p.stage===8) auto["must-"+(stageOf(8).must.length-1)]=subs.length>0;
+    if(p.stage===9) auto["must-"+(stageOf(9).must.length-1)]=!!(last&&last.status!=="under_review"); }
   const checked=k=>auto[k]!==undefined?auto[k]:!!g[k];
   const allMust=st.must.every((_,i)=>checked("must-"+i));
   const bg=document.createElement("div"); bg.className="modal-bg";
@@ -511,9 +521,24 @@ function openPaper(id){
     <div class="card">
       <h3>ניתוחים</h3>
       <table><thead><tr><th>ניתוח</th><th>מצב</th><th>הערה</th></tr></thead><tbody>
-      ${(p.analyses||[]).map(a=>`<tr><td>${heb(a.name)}</td><td><select data-an="${a.id}">${[["open","פתוח"],["running","רץ"],["done","הושלם"],["verified","אומת"]].map(([k,v])=>`<option value="${k}" ${a.status===k?"selected":""}>${v}</option>`).join("")}</select></td><td class="muted">${heb(a.note||"")}</td></tr>`).join("")}
+      ${(p.analyses||[]).map(a=>`<tr><td>${heb(a.name)}</td><td><select data-an="${a.id}">${[["open","פתוח"],["exploratory","גישוש"],["running","רץ"],["done","הושלם"],["verified","אומת"],["not_in_paper","לא נכנס למאמר"]].map(([k,v])=>`<option value="${k}" ${a.status===k?"selected":""}>${v}</option>`).join("")}</select></td><td class="muted">${heb(a.note||"")}</td></tr>`).join("")}
       </tbody></table>
       <div class="row" style="margin-top:8px"><input id="newan" class="grow" placeholder="ניתוח חדש"><button class="sec" id="addan">הוסף</button></div>
+    </div>
+
+    <div class="card">
+      <h3>הגשות לכתבי עת</h3>
+      ${(p.submissions||[]).length?`<table><thead><tr><th>כתב עת</th><th>הוגש</th><th>מצב</th><th>החלטה</th><th>הערה</th></tr></thead><tbody>
+      ${p.submissions.map((s,i)=>`<tr><td>${ltr(s.journal)}</td><td>${dmy(s.submitted_at)}</td>
+        <td><select data-sub="${i}">${Object.entries(SUB_ST).map(([k,v])=>`<option value="${k}" ${s.status===k?"selected":""}>${v}</option>`).join("")}</select></td>
+        <td>${s.decision_at?dmy(s.decision_at):"—"}</td><td class="muted">${heb(s.note||"")}</td></tr>`).join("")}
+      </tbody></table>`:`<p class="muted">עוד לא הוגש.</p>`}
+      <div class="row" style="margin-top:8px;align-items:flex-end">
+        <div class="grow"><label class="f">כתב עת</label><input id="sub_j" list="sub_jl" style="width:100%;direction:ltr" value="${esc(p.target_journal?journalName(p.target_journal):"")}"><datalist id="sub_jl">${S.journals.map(j=>`<option value="${esc(j.name)}">`).join("")}</datalist></div>
+        <div><label class="f">תאריך הגשה</label><input id="sub_d" type="date" value="${today()}"></div>
+        <div class="grow"><label class="f">הערה</label><input id="sub_n" style="width:100%"></div>
+        <button class="sec" id="sub_add">הגשה חדשה</button>
+      </div>
     </div>
 
     <div class="card"><h3>היסטוריה</h3>
@@ -548,6 +573,26 @@ function openPaper(id){
   };
   bg.querySelectorAll("[data-an]").forEach(s=>s.onchange=async()=>{const a=p.analyses.find(x=>x.id===s.dataset.an);a.status=s.value;addHistory(p,`ניתוח "${a.name}": ${s.options[s.selectedIndex].text}`);await savePaper(p);toast("נשמר");});
   bg.querySelector("#addan").onclick=async()=>{const v=$("#newan").value.trim();if(!v)return;p.analyses=p.analyses||[];p.analyses.push({id:"a"+Date.now().toString(36),name:v,status:"open",note:""});await savePaper(p);bg.remove();openPaper(p.id);};
+  /* הגשות: הבחירה לשנות שלב או מצב נשארת של המשתמש, לכן כל מעבר נשאל */
+  const reopen=async()=>{await savePaper(p);bg.remove();openPaper(p.id);};
+  bg.querySelector("#sub_add").onclick=async()=>{
+    const j=$("#sub_j").value.trim(); if(!j){toast("חסר שם כתב העת");return;}
+    const open=(p.submissions||[]).find(s=>s.status==="under_review"||s.status==="revise");
+    if(open&&!confirm(`ההגשה ל־${open.journal} עדיין פתוחה. לרשום הגשה חדשה בכל זאת?`)) return;
+    p.submissions=p.submissions||[]; p.submissions.push({journal:j,submitted_at:$("#sub_d").value||today(),status:"under_review",decision_at:"",note:$("#sub_n").value.trim()});
+    addHistory(p,`הוגש לכתב העת ${j}`);
+    if(p.stage<8&&confirm("לסמן את המאמר בשלב 8, התאמה לכתב עת והגשה?")){addHistory(p,`מעבר לשלב 8 עם ההגשה`);p.stage=8;}
+    p.next_step=`לחכות להחלטה מ־${j}`; await reopen();
+  };
+  bg.querySelectorAll("[data-sub]").forEach(sel=>sel.onchange=async()=>{
+    const s=p.submissions[+sel.dataset.sub], st=sel.value; s.status=st;
+    s.decision_at=st==="under_review"?"":(s.decision_at||today());
+    addHistory(p,`הגשה ל־${s.journal}: ${SUB_ST[st]}`);
+    if(st==="revise"){ p.next_step=`תיקונים לפי הסוקרים של ${s.journal}`; if(p.stage!==9&&confirm("לעבור לשלב 9, תיקונים וקבלה?")){addHistory(p,`מעבר לשלב 9: הוחזר לתיקונים מ־${s.journal}`);p.stage=9;} }
+    if(st==="rejected"){ p.next_step="לבחור את כתב העת הבא ולהגיש"; if(p.stage!==8&&confirm("לחזור לשלב 8 כדי להגיש לכתב העת הבא? ההיסטוריה נשמרת.")){addHistory(p,`חזרה לשלב 8 אחרי דחייה מ־${s.journal}`);p.stage=8;} }
+    if(st==="accepted"){ p.next_step=`התקבל ל־${s.journal}`; if(p.status!=="accepted"&&confirm(`לסמן את המאמר כ"התקבל" ל־${s.journal}?`)){p.status="accepted";p.accepted_journal=s.journal;addHistory(p,`המאמר התקבל ל־${s.journal}`);} }
+    await reopen();
+  });
   const rc=bg.querySelector("#runcard"); if(rc) fillRunCard(p,rc);
   const fr=bg.querySelector("#freeze");
   if(fr) fr.onclick=()=>freezeForPaper(p,$("#exp").value,bg);
