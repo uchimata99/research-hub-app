@@ -935,7 +935,7 @@ function modeCtl(){
   if(!RUN.ok||!RUN.info||RUN.info.mode===undefined) return "";
   if(!LOCALHOST) return ` · <span class="pill ok">מחובר מרחוק לשרת בבית</span>`;
   const srv=RUN.info.mode==="server";
-  return ` · <button id="modebtn" class="mode-btn ${srv?"on":""}" title="מפעילים פעם אחת ומשאירים את המחשב דלוק. לא צריך להפעיל כל בוקר. אחרי הפעלה מחדש של המחשב צריך להפעיל שוב פעם אחת.">${srv?"מצב שרת · לחזור לבית":"מצב בית · להפעיל שרת"}</button>`+
+  return ` · <button id="modebtn" class="mode-btn ${srv?"on":""}" title="מפעילים פעם אחת ומשאירים את המחשב דלוק. לא צריך להפעיל כל בוקר. אם המחשב הופעל מחדש (עדכון, הפסקת חשמל) כשהיה במצב שרת, מצב השרת חוזר לבד אחרי הכניסה לחלונות. במצב בית לא קורה כלום.">${srv?"מצב שרת · לחזור לבית":"מצב בית · להפעיל שרת"}</button>`+
     (srv?` <span class="muted" style="font-size:12px">פועל. אפשר לעבוד מרחוק כל עוד המחשב דלוק.</span>`:` <span class="muted" style="font-size:12px">לעבודה מהלפטופ: להפעיל פעם אחת ולהשאיר את המחשב דלוק.</span>`);
 }
 async function switchMode(){
