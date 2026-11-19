@@ -86,6 +86,23 @@
   #demobar{background:#f5c542;color:#3a2c00;text-align:center;font-weight:600;padding:6px 12px;font-size:14px}
   .mode-btn{background:#ffffff26;color:#fff;border:1px solid #ffffff55;border-radius:999px;padding:2px 10px;font-size:13px}
   .mode-btn.on{background:#2e7d4f;border-color:#2e7d4f}
+  .chat{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card);margin-bottom:16px}
+  .chat-h{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line)}
+  .chat-log{padding:14px;display:flex;flex-direction:column;gap:12px;max-height:62vh;overflow:auto;background:#fcfbf9}
+  .bub{max-width:82%;border-radius:12px;padding:8px 12px;line-height:1.6;overflow-wrap:anywhere}
+  .bub.me{align-self:flex-start;background:var(--accent-soft);color:var(--accent)}
+  .bub.cl{align-self:flex-end;border:1px solid var(--line);background:#fff}
+  .bub.cl.err{border-color:var(--bad)}
+  .bub .md p{margin:4px 0}
+  .bub .chg{margin-top:8px;padding-top:6px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+  .bub .apv{margin-top:8px;padding:8px;border-radius:8px;background:var(--warn-soft)}
+  .bub .meta{font-size:11px;color:var(--muted);margin-top:4px}
+  .chat-prog{align-self:flex-end;font-size:12px;color:var(--muted)}
+  .chat-f{border-top:1px solid var(--line);padding:10px 14px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+  .chips button{font-size:12px;padding:4px 10px;background:#fff;color:var(--accent);border:1px solid var(--line)}
+  #chatin{min-height:44px}
+  button.send{background:var(--claude)}
   .hidden{display:none}
   .toast{position:fixed;bottom:18px;left:18px;background:#1f2f45;color:#fff;padding:10px 16px;border-radius:10px;z-index:30}
   .center{text-align:center;padding:50px 20px}
@@ -447,7 +464,7 @@ function openPaper(id){
   const allMust=st.must.every((_,i)=>checked("must-"+i));
   const bg=document.createElement("div"); bg.className="modal-bg";
   bg.innerHTML=`<div class="modal">
-    <div class="row"><h2 class="grow">${esc(p.title)}</h2><button class="ghost" id="x">סגור ✕</button></div>
+    <div class="row"><h2 class="grow">${esc(p.title)}</h2>${ENG?`<button class="send" id="askthis">שאל את קלוד</button>`:""}<button class="ghost" id="x">סגור ✕</button></div>
     <div class="stages">${S.stages.map(s=>`<div class="stg ${s.n<p.stage?"done":s.n===p.stage?"cur":""}">${s.n}<br>${esc(s.name)}</div>`).join("")}</div>
     <p class="muted">${esc(st.desc||"")}</p>
 
@@ -506,6 +523,7 @@ function openPaper(id){
   document.body.appendChild(bg);
   const close=()=>{bg.remove();render();renderNav();};
   bg.querySelector("#x").onclick=close;
+  const at=bg.querySelector("#askthis"); if(at) at.onclick=()=>openChatFor(p.id);
   bg.onclick=e=>{if(e.target===bg)close();};
   bg.querySelectorAll("[data-g]").forEach(cb=>cb.onchange=async()=>{
     p.gates=p.gates||{}; p.gates[p.stage]=p.gates[p.stage]||{}; p.gates[p.stage][cb.dataset.g]=cb.checked;
@@ -742,34 +760,83 @@ const COMMANDS=[
   ["/reviewers <paper-id>","טבלת הערות סוקרים, תגובות, ומכתב תשובה"],
   ["/verify","בדיקת שלמות: כל קובץ בארכיון תואם ליומן, וכל תמונה קפואה תואמת למקור"]
 ];
-/* בקשה לקלוד דרך המנוע: עובד בכל מחשב שהלוח פתוח בו דרך המנוע, גם מרחוק דרך המנהרה */
+/* שיחה עם קלוד: חלון שיחה לכל מאמר, קלוד רץ במחשב שבו המנוע פועל (גם מרחוק דרך המנהרה) */
+const SHORTCUTS=[
+  ["מה לעשות היום","מה לעשות היום? פעל לפי claude-commands/morning.md ותן סיכום קצר."],
+  ["סיכום היומן","סכם במשפטים ספורים את יומן העבודה: איפה עצרנו ומה הצעד הבא."],
+  ["בדיקת שער","בדוק את השער של השלב הנוכחי לפי claude-commands/gate.md."],
+  ["הרצת ניתוח","הרץ את ניתוחי המאמר לפי claude-commands/analyze.md והסבר את התוצאות בעברית פשוטה."],
+  ["טיוטת פרק","עזור לי לנסח פרק לפי claude-commands/draft.md. קודם שאל אותי איזה פרק."]];
+S.chatKey=S.chatKey||"_main";
 function askCard(){
-  if(!ENG) return `<div class="card"><h2>בקשה לקלוד</h2><p class="muted">זמין רק כשהלוח פתוח דרך המנוע (בבית, או מרחוק דרך הכתובת של השרת).</p></div>`;
-  return `<div class="card"><h2>בקשה לקלוד</h2>
-    <p class="muted">קלוד רץ במחשב שבבית ועונה כאן. הוא יכול לקרוא את כל התיקייה, לעדכן מאמרים, משימות ויומנים, ולהריץ את קובצי הניתוח. פעולות שדורשות אישור יחזרו כשאלה.</p>
-    <div class="row"><select id="askp"><option value="">כללי (בלי מאמר)</option>${S.papers.filter(p=>p.status==="active"||p.status==="paused").map(p=>`<option value="${esc(p.id)}">${esc(p.short||short(p.title))}</option>`).join("")}</select></div>
-    <textarea id="askt" style="margin-top:8px" placeholder="מה לעשות? למשל: מה הצעד הבא במאמר, או: תעדכן שהשלמתי את תאריכי ימי התצפית"></textarea>
-    <div class="row" style="margin-top:8px"><button id="asks">שלח לקלוד</button><span class="muted" id="askst"></span></div>
-    <div id="aska"></div></div>`;
+  if(!ENG) return `<div class="card"><h2>שיחה עם קלוד</h2><p class="muted">זמין רק כשהלוח פתוח דרך המנוע: במחשב בבית, או מרחוק דרך הכתובת של השרת.</p></div>`;
+  const opts=[["_main","כללי (בלי מאמר)"],...S.papers.filter(p=>p.status==="active"||p.status==="paused").map(p=>[p.id,p.short||short(p.title)])];
+  return `<div class="chat">
+    <div class="chat-h"><b>שיחה עם קלוד</b>
+      <select id="chatsel">${opts.map(([v,l])=>`<option value="${esc(v)}" ${v===S.chatKey?"selected":""}>${esc(l)}</option>`).join("")}</select>
+      <span class="grow"></span><span class="muted">${LOCALHOST?"רץ במחשב הזה":"רץ במחשב בבית"}</span>
+      <button class="ghost" id="chatnew" title="קלוד מתחיל מחדש, בלי ההקשר של השיחה הזו. היומן נשאר.">שיחה חדשה</button></div>
+    <div class="chat-log" id="chatlog"><p class="muted">טוען…</p></div>
+    <div class="chat-f">
+      <div class="chips">${SHORTCUTS.map(([l],i)=>`<button data-sc="${i}">${esc(l)}</button>`).join("")}</div>
+      <div class="row" style="align-items:flex-end"><textarea id="chatin" class="grow" placeholder="מה לעשות?"></textarea><button class="send" id="chatsend">שלח</button></div>
+    </div></div>`;
 }
-async function askClaude(){
-  const prompt=$("#askt").value.trim(), paper=$("#askp").value; if(!prompt) return;
-  $("#asks").disabled=true; $("#askst").textContent="קלוד עובד על זה…"; $("#aska").innerHTML="";
+function bubble(m){
+  if(m.role==="user") return `<div class="bub me">${esc(m.text).replace(/\n/g,"<br>")}</div>`;
+  const chg=(m.changes||[]).length?`<div class="chg">${m.changes.map(c=>`<div>✓ ${heb(c)}</div>`).join("")}</div>`:"";
+  const ap=m.approval?`<div class="apv"><div class="muted">צריך את האישור שלך:</div><div><b>${heb(m.approval)}</b></div>
+    <div class="row" style="margin-top:6px"><button data-ok="${esc(m.approval)}">מאשר</button><button class="sec" data-no="1">לא עכשיו</button></div></div>`:"";
+  return `<div class="bub cl ${m.status==="failed"?"err":""}"><div class="md">${md(m.text||"")}</div>${chg}${ap}<div class="meta">${esc((m.at||"").slice(11,16))}${m.machine&&S.machines[m.machine]?` · ${esc(S.machines[m.machine].label)}`:""}</div></div>`;
+}
+async function chatApi(path,opt={}){
+  const r=await fetch(RUN.url+path,{cache:"no-store",...opt,headers:{"Content-Type":"application/json","X-Token":RUN.token||"",...(opt.headers||{})}});
+  return r.json();
+}
+async function loadChat(){
+  const box=$("#chatlog"); if(!box) return;
   try{
-    const r=await (await fetch(RUN.url+"/claude",{method:"POST",headers:{"Content-Type":"application/json","X-Token":RUN.token||""},body:JSON.stringify({prompt,paper})})).json();
+    const r=await chatApi("/chat?key="+encodeURIComponent(S.chatKey));
+    const ms=r.messages||[];
+    box.innerHTML=ms.length?ms.map(bubble).join(""):`<p class="muted">עוד אין שיחה כאן. אפשר לכתוב בקשה, או לבחור אחד הקיצורים.</p>`;
+    bindChatButtons(); box.scrollTop=box.scrollHeight;
+  }catch(e){ box.innerHTML=`<p class="pill bad">אין חיבור למנוע</p>`; }
+}
+function bindChatButtons(){
+  document.querySelectorAll("#chatlog [data-ok]").forEach(b=>b.onclick=()=>sendChat("אישור: "+b.dataset.ok));
+  document.querySelectorAll("#chatlog [data-no]").forEach(b=>b.onclick=()=>{b.closest(".apv").innerHTML=`<div class="muted">לא אושר. אפשר לבקש שוב בכל זמן.</div>`;});
+}
+async function sendChat(text){
+  text=(text||"").trim(); if(!text) return;
+  const box=$("#chatlog"), btn=$("#chatsend");
+  if(box.querySelector("p.muted")) box.innerHTML="";
+  box.insertAdjacentHTML("beforeend",bubble({role:"user",text})+`<div class="chat-prog" id="chatprog">שולח…</div>`);
+  box.scrollTop=box.scrollHeight; btn.disabled=true; $("#chatin").value="";
+  try{
+    const r=await chatApi("/claude",{method:"POST",body:JSON.stringify({prompt:text,paper:S.chatKey==="_main"?"":S.chatKey})});
     if(!r.job) throw new Error(r.error||"המנוע סירב");
     const t0=Date.now();
     const poll=async()=>{
-      const s=await (await fetch(RUN.url+"/job?id="+r.job,{cache:"no-store",headers:{"X-Token":RUN.token||""}})).json();
-      if(s.status==="done"||s.status==="failed"){
-        $("#asks").disabled=false; $("#askst").textContent=s.status==="done"?`הסתיים (${Math.round((Date.now()-t0)/1000)} שניות)`:"נכשל";
-        $("#aska").innerHTML=`<div class="md" style="border-top:1px solid var(--line);margin-top:10px;padding-top:8px">${md(s.result||"")}</div>`;
-        if(s.status==="done"){ await loadAll(); renderNav(); }
-      } else { $("#askst").textContent=`קלוד עובד על זה… ${Math.round((Date.now()-t0)/1000)} שניות`; setTimeout(poll,1500); }
+      const s=await chatApi("/job?id="+r.job);
+      const p=$("#chatprog");
+      if(s.status==="done"||s.status==="failed"){ btn.disabled=false; await loadAll(); renderNav(); await loadChat(); return; }
+      if(p) p.textContent=`${s.progress||"קלוד עובד"}… ${Math.round((Date.now()-t0)/1000)} שניות`;
+      setTimeout(poll,1500);
     };
-    setTimeout(poll,1500);
-  }catch(e){ $("#asks").disabled=false; $("#askst").textContent="שגיאה: "+e.message; }
+    setTimeout(poll,1200);
+  }catch(e){ btn.disabled=false; const p=$("#chatprog"); if(p) p.textContent="שגיאה: "+e.message; }
 }
+function bindChat(){
+  if(!$("#chatlog")) return;
+  $("#chatsel").onchange=e=>{S.chatKey=e.target.value;loadChat();};
+  $("#chatsend").onclick=()=>sendChat($("#chatin").value);
+  $("#chatin").onkeydown=e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();sendChat($("#chatin").value);}};
+  document.querySelectorAll("[data-sc]").forEach(b=>b.onclick=()=>sendChat(SHORTCUTS[+b.dataset.sc][1]));
+  $("#chatnew").onclick=async()=>{ if(!confirm("להתחיל שיחה חדשה? קלוד לא יזכור את השיחה הזו, אבל היומן של המאמר נשאר.")) return;
+    await chatApi("/chat/reset?key="+encodeURIComponent(S.chatKey),{method:"POST",body:"{}"}); loadChat(); };
+  loadChat();
+}
+function openChatFor(id){ S.chatKey=id; S.tab="claude"; document.querySelector(".modal-bg")?.remove(); renderNav(); render(); }
 function renderClaude(){
   $("#app").innerHTML=askCard()+`<div class="card"><h2>איך עובדים עם קלוד במערכת</h2>
     <p>פותחים את קלוד קוד, בוחרים את תיקיית המערכת, וכותבים אחת מהפקודות. הכללים של קלוד כתובים בקובץ שבתוך התיקייה, לכן הוא עובד אותו דבר בבית ובמשרד.</p>
@@ -791,7 +858,7 @@ function renderClaude(){
   document.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>copy(b.dataset.c));
   $("#reload").onclick=async()=>{await loadAll();renderNav();toast("רוענן");};
   $("#chk").onclick=()=>runJob("R/check_packages.R","",$("#chkbox"));
-  const as=$("#asks"); if(as) as.onclick=askClaude;
+  bindChat();
 }
 
 /* ============ מנוע הניתוח המקומי ============ */
