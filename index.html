@@ -84,6 +84,8 @@
   .lb.ghost-b{background:transparent;color:var(--muted);border:1px solid var(--line)}
   .claude-pill{background:var(--claude);color:#fff;border-radius:999px;padding:2px 10px;margin-inline-start:8px;text-decoration:none;font-weight:600}
   #demobar{background:#f5c542;color:#3a2c00;text-align:center;font-weight:600;padding:6px 12px;font-size:14px}
+  .mode-btn{background:#ffffff26;color:#fff;border:1px solid #ffffff55;border-radius:999px;padding:2px 10px;font-size:13px}
+  .mode-btn.on{background:#2e7d4f;border-color:#2e7d4f}
   .hidden{display:none}
   .toast{position:fixed;bottom:18px;left:18px;background:#1f2f45;color:#fff;padding:10px 16px;border-radius:10px;z-index:30}
   .center{text-align:center;padding:50px 20px}
@@ -740,8 +742,36 @@ const COMMANDS=[
   ["/reviewers <paper-id>","טבלת הערות סוקרים, תגובות, ומכתב תשובה"],
   ["/verify","בדיקת שלמות: כל קובץ בארכיון תואם ליומן, וכל תמונה קפואה תואמת למקור"]
 ];
+/* בקשה לקלוד דרך המנוע: עובד בכל מחשב שהלוח פתוח בו דרך המנוע, גם מרחוק דרך המנהרה */
+function askCard(){
+  if(!ENG) return `<div class="card"><h2>בקשה לקלוד</h2><p class="muted">זמין רק כשהלוח פתוח דרך המנוע (בבית, או מרחוק דרך הכתובת של השרת).</p></div>`;
+  return `<div class="card"><h2>בקשה לקלוד</h2>
+    <p class="muted">קלוד רץ במחשב שבבית ועונה כאן. הוא יכול לקרוא את כל התיקייה, לעדכן מאמרים, משימות ויומנים, ולהריץ את קובצי הניתוח. פעולות שדורשות אישור יחזרו כשאלה.</p>
+    <div class="row"><select id="askp"><option value="">כללי (בלי מאמר)</option>${S.papers.filter(p=>p.status==="active"||p.status==="paused").map(p=>`<option value="${esc(p.id)}">${esc(p.short||short(p.title))}</option>`).join("")}</select></div>
+    <textarea id="askt" style="margin-top:8px" placeholder="מה לעשות? למשל: מה הצעד הבא במאמר, או: תעדכן שהשלמתי את תאריכי ימי התצפית"></textarea>
+    <div class="row" style="margin-top:8px"><button id="asks">שלח לקלוד</button><span class="muted" id="askst"></span></div>
+    <div id="aska"></div></div>`;
+}
+async function askClaude(){
+  const prompt=$("#askt").value.trim(), paper=$("#askp").value; if(!prompt) return;
+  $("#asks").disabled=true; $("#askst").textContent="קלוד עובד על זה…"; $("#aska").innerHTML="";
+  try{
+    const r=await (await fetch(RUN.url+"/claude",{method:"POST",headers:{"Content-Type":"application/json","X-Token":RUN.token||""},body:JSON.stringify({prompt,paper})})).json();
+    if(!r.job) throw new Error(r.error||"המנוע סירב");
+    const t0=Date.now();
+    const poll=async()=>{
+      const s=await (await fetch(RUN.url+"/job?id="+r.job,{cache:"no-store",headers:{"X-Token":RUN.token||""}})).json();
+      if(s.status==="done"||s.status==="failed"){
+        $("#asks").disabled=false; $("#askst").textContent=s.status==="done"?`הסתיים (${Math.round((Date.now()-t0)/1000)} שניות)`:"נכשל";
+        $("#aska").innerHTML=`<div class="md" style="border-top:1px solid var(--line);margin-top:10px;padding-top:8px">${md(s.result||"")}</div>`;
+        if(s.status==="done"){ await loadAll(); renderNav(); }
+      } else { $("#askst").textContent=`קלוד עובד על זה… ${Math.round((Date.now()-t0)/1000)} שניות`; setTimeout(poll,1500); }
+    };
+    setTimeout(poll,1500);
+  }catch(e){ $("#asks").disabled=false; $("#askst").textContent="שגיאה: "+e.message; }
+}
 function renderClaude(){
-  $("#app").innerHTML=`<div class="card"><h2>איך עובדים עם קלוד במערכת</h2>
+  $("#app").innerHTML=askCard()+`<div class="card"><h2>איך עובדים עם קלוד במערכת</h2>
     <p>פותחים את קלוד קוד, בוחרים את תיקיית המערכת, וכותבים אחת מהפקודות. הכללים של קלוד כתובים בקובץ שבתוך התיקייה, לכן הוא עובד אותו דבר בבית ובמשרד.</p>
     <p>אחרי שקלוד מסיים, לוחצים כאן על ריענון כדי לראות את השינויים.</p>
     <button id="reload">ריענון</button></div>
@@ -761,6 +791,7 @@ function renderClaude(){
   document.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>copy(b.dataset.c));
   $("#reload").onclick=async()=>{await loadAll();renderNav();toast("רוענן");};
   $("#chk").onclick=()=>runJob("R/check_packages.R","",$("#chkbox"));
+  const as=$("#asks"); if(as) as.onclick=askClaude;
 }
 
 /* ============ מנוע הניתוח המקומי ============ */
@@ -774,8 +805,25 @@ async function runnerCheck(){
   }
   try{const r=await fetch(RUN.url+"/status",{cache:"no-store"});RUN.ok=r.ok;RUN.info=await r.json();}catch(e){RUN.ok=false;}
   const el=$("#eng"); const m=RUN.ok&&RUN.info&&S.machines?S.machines[RUN.info.machine]:null;
-  if(el) el.innerHTML=(RUN.ok?"מנוע הניתוח: מחובר ✓":"מנוע הניתוח: כבוי")+(m&&m.main_session?` <a class="claude-pill" href="${esc(m.main_session)}">קלוד · שיחה ראשית</a>`:"");
+  if(el) el.innerHTML=(RUN.ok?"מנוע הניתוח: מחובר ✓":"מנוע הניתוח: כבוי")+(m&&m.main_session?` <a class="claude-pill" href="${esc(m.main_session)}">קלוד · שיחה ראשית</a>`:"")+modeCtl();
+  const mb=$("#modebtn"); if(mb) mb.onclick=switchMode;
   return RUN.ok;
+}
+/* מצב שרת או בית של המחשב בבית. מרחוק (דרך המנהרה) רק מציגים, כדי לא לסגור את החיבור של עצמך */
+const LOCALHOST=/^(127\.0\.0\.1|localhost)$/.test(location.hostname);
+function modeCtl(){
+  if(!RUN.ok||!RUN.info||RUN.info.mode===undefined) return "";
+  if(!LOCALHOST) return ` · <span class="pill ok">מחובר מרחוק לשרת בבית</span>`;
+  const srv=RUN.info.mode==="server";
+  return ` · <button id="modebtn" class="mode-btn ${srv?"on":""}">${srv?"מצב שרת · לחזור לבית":"מצב בית · להפעיל שרת"}</button>`;
+}
+async function switchMode(){
+  const to=RUN.info.mode==="server"?"home":"server";
+  if(to==="server"&&!confirm("להפעיל מצב שרת? המחשב לא ייכנס לשינה, והלוח יהיה זמין מרחוק עם קוד לדוא״ל שלך.")) return;
+  $("#modebtn").disabled=true; $("#modebtn").textContent=to==="server"?"מפעיל שרת…":"עובר למצב בית…";
+  await fetch(RUN.url+"/mode",{method:"POST",headers:{"Content-Type":"application/json","X-Token":RUN.token||""},body:JSON.stringify({mode:to})});
+  for(let i=0;i<30;i++){ await new Promise(r=>setTimeout(r,2000)); await runnerCheck(); if(RUN.info&&RUN.info.mode===to) break; }
+  toast(to==="server"?"מצב שרת פעיל":"מצב בית");
 }
 async function runJob(script,paper,box,onDone){
   if(!(await runnerCheck())){box.innerHTML=ENGINE_OFF;return;}
