@@ -52,6 +52,7 @@
   .th-filters td{background:#faf9f7;padding:4px 6px 8px;border-bottom:1px solid var(--line)}
   .th-f{width:100%;min-width:64px;font:inherit;font-size:13px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
   .th-f:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  .add-task{background:#faf9f7;border:1px solid var(--line);border-radius:10px;padding:12px;margin:4px 0 14px}
   .row-nav{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
   .row-pos{font-size:11px;color:var(--muted);text-align:center;margin-top:3px}
   .arr{background:#fff;color:var(--accent);border:1px solid var(--line);border-radius:8px;width:28px;height:28px;padding:0;font-size:17px;line-height:1;display:inline-flex;align-items:center;justify-content:center;transition:background-color 150ms ease,border-color 150ms ease,transform 150ms cubic-bezier(0.23,1,0.32,1)}
@@ -433,7 +434,7 @@ function renderProj(){
   $("#projnew").onclick=()=>{menu.classList.add("hidden");newProject();};
 }
 document.addEventListener("click",()=>{const m=$("#projmenu");if(m)m.classList.add("hidden");});
-const TABS=[["morning","לוח בוקר"],["papers","מאמרים"],["data","נתונים"],["tasks","משימות"],["library","ספרייה"],["claude","קלוד"]];
+const TABS=[["morning","לוח בוקר"],["papers","מאמרים"],["data","נתונים"],["library","ספרייה"],["claude","קלוד"]];
 
 async function loadAll(){
   const st=await readJSON("config/stages.json");
@@ -514,7 +515,8 @@ function renderNav(){
   renderProj();
 }
 function render(){
-  ({morning:renderMorning,papers:renderPapers,data:renderData,tasks:renderTasks,library:renderLibrary,claude:renderClaude}[S.tab])();
+  if(S.tab==="tasks") S.tab="morning";
+  ({morning:renderMorning,papers:renderPapers,data:renderData,tasks:renderMorning,library:renderLibrary,claude:renderClaude}[S.tab])();
 }
 /* מסמן כל טבלה עם כותרות כ"נערמת", ומצמיד לכל תא את שם העמודה שלו (לחלון צר) */
 function stackTables(root){
@@ -628,6 +630,18 @@ function mPass(i,F){
   if(F.age&&!i.done&&!((i.age??0)>+F.age)) return false;
   return true;
 }
+function addTaskForm(){
+  return `<div class="add-task">
+    <div class="row">
+      <input id="tt" class="grow" placeholder="מה צריך לעשות" aria-label="המשימה">
+      <select id="ty" aria-label="סוג">${S.workTypes.map(w=>`<option ${w==="מרפאה"?"selected":""}>${w}</option>`).join("")}</select>
+      <select id="tp" aria-label="מאמר"><option value="">ללא מאמר</option>${S.papers.filter(p=>p.status==="active").map(p=>`<option value="${p.id}">${esc(short(p.title))}</option>`).join("")}</select>
+      <select id="tpr" title="עדיפות" aria-label="עדיפות">${[1,2,3,4,5].map(n=>`<option ${n===3?"selected":""}>${n}</option>`).join("")}</select>
+      <button id="tadd">להוסיף</button>
+    </div>
+    <input id="tnote" style="width:100%;margin-top:8px" placeholder="הערה או הרעיון שממנו זה עלה (לא חובה)" aria-label="הערה">
+  </div>`;
+}
 function renderMorning(){
   const items=morningItems();
   const F=S.mf=S.mf||{pr:"",type:"",text:"",paper:"",age:""};
@@ -672,7 +686,8 @@ function renderMorning(){
     <div class="stat"><span class="muted">ימים מאז הייצוא האחרון</span><b>${le?daysSince(le.uploaded_at):"—"}</b></div>
   </div>
   <div class="card">
-    <div class="row"><h2 class="grow">מה עושים היום</h2>${anyF?`<button class="ghost" id="mfclear">לנקות סינון</button>`:""}</div>
+    <div class="row"><h2 class="grow">מה עושים היום</h2>${anyF?`<button class="ghost" id="mfclear">לנקות סינון</button>`:""}<button class="sec" id="madd" aria-expanded="${S.mAdd?"true":"false"}">${S.mAdd?"סגירה":"+ משימה חדשה"}</button></div>
+    ${S.mAdd?addTaskForm():""}
     <table class="mtable"><thead><tr>${MCOLS.map(([c,l])=>c==="stage"?`<th>שלב</th>`:
       `<th><button class="th-sort ${SO.col===c?"on":""}" data-sort="${c}" title="מיון">${l}<span class="th-ar">${SO.col===c?(SO.dir<0?"▼":"▲"):"↕"}</span></button></th>`).join("")}<th></th></tr>
       <tr class="th-filters">${MCOLS.map(([c])=>`<td>${filt[c]}</td>`).join("")}<td></td></tr></thead><tbody>
@@ -698,6 +713,13 @@ function renderMorning(){
   document.querySelectorAll("select.th-f").forEach(s=>s.onchange=()=>{F[s.dataset.f]=s.value;renderMorning();});
   const tx=document.querySelector('input.th-f[data-f="text"]');
   if(tx){ tx.oninput=()=>{F.text=tx.value;clearTimeout(S.mfT);S.mfT=setTimeout(()=>{renderMorning();const n=document.querySelector('input.th-f[data-f="text"]');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length);}},250);}; }
+  $("#madd").onclick=()=>{S.mAdd=!S.mAdd;renderMorning();if(S.mAdd){const t=$("#tt");if(t)t.focus();}};
+  if(S.mAdd){ const add=async()=>{const title=$("#tt").value.trim();if(!title){$("#tt").focus();return;}
+      const nt={id:"t"+Date.now().toString(36),title,type:$("#ty").value,paper:$("#tp").value,priority:+$("#tpr").value,status:"open",note:$("#tnote").value.trim(),created_at:today(),done_at:null};
+      S.tasks.push(nt); await saveTasks(); S.mAdd=false;
+      /* השורה של המשימה החדשה מציגה אותה */
+      const pp=paperById(nt.paper); S.rowPos=S.rowPos||{}; S.rowPos[pp?"p:"+pp.id:"t:"+nt.type]=itemKey({kind:"task",done:false,tid:nt.id,paper:pp,text:nt.title});toast("המשימה נוספה");renderMorning();};
+    $("#tadd").onclick=add; $("#tt").onkeydown=e=>{if(e.key==="Enter")add();}; }
   const cl=$("#mfclear"); if(cl) cl.onclick=()=>{S.mf={pr:"",type:"",text:"",paper:"",age:""};renderMorning();};
   document.querySelectorAll("[data-mv]").forEach(b=>b.onclick=()=>{const [rx,d]=b.dataset.mv.split(":").map(Number);const r=rows[rx];const n=r.seq[r.x+d];if(n){S.rowPos[r.k]=itemKey(n);S.mKeep=true;renderMorning();}});
   document.querySelectorAll("[data-row]").forEach(b=>b.onclick=async()=>{const r=rows[+b.dataset.row];const i=r.cur;
@@ -1076,36 +1098,6 @@ async function ingest(file){
 }
 
 /* ============ משימות ============ */
-function renderTasks(){
-  const showDone=S.showDone;
-  const list=S.tasks.filter(t=>showDone||t.status==="open").sort((a,b)=>(b.priority||0)-(a.priority||0));
-  $("#app").innerHTML=`<div class="card">
-    <h2>משימה חדשה</h2>
-    <div class="row">
-      <input id="tt" class="grow" placeholder="מה צריך לעשות">
-      <select id="ty">${S.workTypes.map(w=>`<option ${w==="מרפאה"?"selected":""}>${w}</option>`).join("")}</select>
-      <select id="tp"><option value="">ללא מאמר</option>${S.papers.filter(p=>p.status==="active").map(p=>`<option value="${p.id}">${esc(short(p.title))}</option>`).join("")}</select>
-      <select id="tpr" title="עדיפות">${[1,2,3,4,5].map(n=>`<option ${n===3?"selected":""}>${n}</option>`).join("")}</select>
-      <button id="tadd">הוסף</button>
-    </div>
-    <input id="tnote" style="width:100%;margin-top:8px" placeholder="הערה או הרעיון שממנו זה עלה (לא חובה)">
-  </div>
-  <div class="card"><div class="row"><h2 class="grow">משימות</h2><label class="muted"><input type="checkbox" id="sd" ${showDone?"checked":""}> להציג גם שבוצעו</label></div>
-    <table><thead><tr><th>עדיפות</th><th>סוג</th><th>משימה</th><th>מאמר</th><th>נוצרה</th><th></th></tr></thead><tbody>
-    ${list.map(t=>`<tr><td>${prBadge(t.priority)}</td><td><span class="pill ${t.type==="מרפאה"?"warn":"gray"}">${esc(t.type)}</span></td>
-      <td>${t.status==="done"?`<s>${heb(t.title)}</s>`:`<b>${heb(t.title)}</b>`}${t.note?`<div class="muted">${heb(t.note)}</div>`:""}</td>
-      <td>${t.paper?paperChip(paperById(t.paper)||{id:t.paper,title:t.paper}):"—"}</td>
-      <td class="muted">${esc(t.created_at)}</td>
-      <td>${t.status==="open"?`<button class="done-btn" data-td="${t.id}">לסמן כבוצע</button>`:`<button class="done-btn is-done" data-tr="${t.id}" title="בוצע. לחיצה פותחת את המשימה מחדש">✓ בוצע</button>`}</td></tr>`).join("")}
-    </tbody></table></div>`;
-  $("#sd").onchange=e=>{S.showDone=e.target.checked;renderTasks();};
-  $("#tadd").onclick=async()=>{const title=$("#tt").value.trim();if(!title)return;
-    S.tasks.push({id:"t"+Date.now().toString(36),title,type:$("#ty").value,paper:$("#tp").value,priority:+$("#tpr").value,status:"open",note:$("#tnote").value.trim(),created_at:today(),done_at:null});
-    await saveTasks();toast("נוסף");renderTasks();};
-  document.querySelectorAll("[data-td]").forEach(b=>b.onclick=async()=>{const t=S.tasks.find(x=>x.id===b.dataset.td);t.status="done";t.done_at=today();await saveTasks();renderTasks();});
-  document.querySelectorAll("[data-tr]").forEach(b=>b.onclick=async()=>{const t=S.tasks.find(x=>x.id===b.dataset.tr);t.status="open";t.done_at=null;await saveTasks();renderTasks();});
-  bindOpen();
-}
 
 /* ============ ספרייה ============ */
 function renderLibrary(){
