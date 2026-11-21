@@ -956,7 +956,7 @@ async function runJob(script,paper,box,onDone){
   const poll=async()=>{
     const s=await (await fetch(RUN.url+"/job?id="+j.job,{cache:"no-store",headers:{"X-Token":RUN.token||""}})).json();
     const st={running:"רץ",starting:"מתחיל",done:"הסתיים בהצלחה",failed:"נכשל"}[s.status]||s.status;
-    box.innerHTML=`<p><span class="pill ${s.status==="done"?"ok":s.status==="failed"?"bad":""}">${esc(st)}</span> <span class="muted">${esc(script)}</span></p><pre class="log">${esc(s.log||"")}</pre>`;
+    box.innerHTML=`<p><span class="pill ${s.status==="done"?"ok":s.status==="failed"?"bad":""}">${esc(st)}</span> <span class="muted">${esc(script)}</span></p>${s.installed&&[].concat(s.installed).length?`<p><span class="pill ok">נוספה חבילה: ${esc([].concat(s.installed).join(", "))}</span></p>`:""}<pre class="log">${esc(s.log||"")}</pre>`;
     const lg=box.querySelector("pre"); lg.scrollTop=lg.scrollHeight;
     if(s.status==="done"||s.status==="failed"){ if(onDone) onDone(s); } else setTimeout(poll,1500);
   };
