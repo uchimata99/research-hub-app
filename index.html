@@ -99,7 +99,10 @@
   .sw input:focus-visible+.sw-track{outline:2px solid #fff;outline-offset:2px}
   .sw input:disabled+.sw-track{opacity:.6}
   .sw-sub{opacity:.75;font-size:12px}
-  #srvsw{display:inline-flex;align-items:center;gap:10px}
+  header{position:relative}
+  #srvsw{display:inline-flex;align-items:center;gap:10px;position:absolute;left:20px;top:12px}
+  header:has(#srvsw:not(:empty)){padding-left:250px}
+  @media (max-width:900px){ #srvsw{position:static} header:has(#srvsw:not(:empty)){padding-left:20px} }
   .cl-ico{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:var(--claude);flex:none}
   .cl-ico:hover{filter:brightness(1.1)}
   .cl-ico svg{width:18px;height:18px}
@@ -445,7 +448,7 @@ function renderNav(){
   $("#nav").innerHTML=TABS.map(([k,l])=>`<button data-t="${k}" class="${S.tab===k?"on":""}">${l}</button>`).join("");
   $("#nav").querySelectorAll("button").forEach(b=>b.onclick=()=>{S.tab=b.dataset.t;renderNav();render();});
   const le=latestExport();
-  $("#meta").textContent=le?`${isGeneral()?"קובץ נתונים אחרון":"ייצוא אחרון"}: ${le.export_date||String(le.uploaded_at||"").slice(0,10)} · לפני ${daysSince(le.uploaded_at)} ימים`:(isGeneral()?"עוד לא נקלטו נתונים":"עוד לא נקלט ייצוא");
+  $("#meta").textContent=le?`${isGeneral()?"קובץ נתונים אחרון":"ייצוא אחרון"}: ${le.export_date||String(le.uploaded_at||"").slice(0,10)} · לפני ${daysSince(le.uploaded_at)} ימים`:"";
   renderProj();
 }
 function render(){
