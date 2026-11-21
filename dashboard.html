@@ -22,7 +22,6 @@
   nav button{background:transparent;border:0;color:#cfd8e3;padding:8px 14px;border-radius:8px;font-size:15px;cursor:pointer}
   nav button.on{background:#ffffff1f;color:#fff;font-weight:600}
   main{max-width:1640px;margin:0 auto;padding:20px 24px}
-  .card:has(> .mtable){overflow-x:auto}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
   .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
   .grow{flex:1}
@@ -50,7 +49,8 @@
   .mtable tbody td{vertical-align:middle}
   .mtable th:nth-child(6),.mtable td:nth-child(6){text-align:center}
   .mtable th:last-child,.mtable td:last-child{text-align:center}
-  .th-filters td{background:#faf9f7;padding:4px 6px 8px;border-bottom:1px solid var(--line)}
+  .mtable th.th-col{vertical-align:top;padding-bottom:8px}
+  .th-fw{margin-top:6px;font-weight:400}
   .th-f{width:100%;min-width:56px;font:inherit;font-size:13px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
   .th-f.pr-bad{background:var(--bad-soft);color:var(--bad);border-color:var(--bad);font-weight:600}
   .th-f.pr-warn{background:var(--warn-soft);color:var(--warn);border-color:var(--warn);font-weight:600}
@@ -123,6 +123,9 @@
   .modal-bg.float{position:fixed;inset:auto;top:0;left:0;width:0;height:0;padding:0;background:transparent;overflow:visible;display:block;pointer-events:none}
   .modal-bg.float .modal{position:fixed;pointer-events:auto;max-width:none;max-height:calc(100vh - 24px);overflow:auto;border:1px solid var(--line);box-shadow:0 14px 44px #0f1a2a40,0 2px 6px #0f1a2a1f;padding-top:0}
   .modal-bg.float .drag-bar{position:sticky;top:0;z-index:2;background:#fff;margin:0 -20px 8px;padding:12px 20px 8px;border-bottom:1px solid var(--line);cursor:grab;user-select:none}
+  .modal-bg.float .modal.pulse{animation:cardpulse 500ms cubic-bezier(0.23,1,0.32,1)}
+  @keyframes cardpulse{0%{box-shadow:0 0 0 0 #2f5d8a66,0 14px 44px #0f1a2a40}100%{box-shadow:0 0 0 10px #2f5d8a00,0 14px 44px #0f1a2a40}}
+  @media (prefers-reduced-motion:reduce){ .modal-bg.float .modal.pulse{animation:none} }
   .modal-bg.float .modal.dragging{opacity:.96} .modal-bg.float .modal.dragging .drag-bar{cursor:grabbing}
   .md h1{font-size:20px}.md h2{font-size:17px}.md table{margin:8px 0}
   .bar{height:8px;border-radius:4px;background:#eee;overflow:hidden;width:90px;display:inline-block;vertical-align:middle}
@@ -279,7 +282,7 @@
   const sc=()=>{h.classList.toggle("scrolled",scrollY>4);document.documentElement.style.setProperty("--hdr-bot",Math.max(0,h.getBoundingClientRect().bottom)+"px");}; addEventListener("scroll",sc,{passive:true}); sc();})();
 /* חלונות צפים: כרטיסים (מאמר, משימה, פירוט) נפתחים כחלונות שאפשר לגרור, כמה במקביל, והלוח נשאר זמין */
 (function(){
-  let z=40, n=0;
+  let z=40, n=0; const POS={};
   const wide=()=>innerWidth>=760;
   const front=bg=>{bg.style.zIndex=++z;};
   function floatify(bg){
@@ -287,10 +290,12 @@
     const m=bg.querySelector(".modal"); if(!m) return;
     bg.classList.add("float"); front(bg);
     const w=Math.min(m.style.maxWidth?parseInt(m.style.maxWidth):780,innerWidth-24);
-    const off=(n++%8)*28;
-    m.style.width=w+"px";
-    m.style.left=Math.max(8,Math.min(innerWidth-w-8,(innerWidth-w)/2-80+off))+"px";
-    m.style.top=Math.max(8,Math.min(innerHeight-160,(parseInt(getComputedStyle(document.documentElement).getPropertyValue("--hdr-bot"))||60)+16+off))+"px";
+    const key=bg.dataset.key||""; m.style.width=w+"px";
+    if(key&&POS[key]){ m.style.left=POS[key][0]+"px"; m.style.top=POS[key][1]+"px"; }
+    else { const off=(n++%8)*28;
+      m.style.left=Math.max(8,Math.min(innerWidth-w-8,(innerWidth-w)/2-80+off))+"px";
+      m.style.top=Math.max(8,Math.min(innerHeight-160,(parseInt(getComputedStyle(document.documentElement).getPropertyValue("--hdr-bot"))||60)+16+off))+"px"; }
+    const keep=()=>{ if(key) POS[key]=[m.offsetLeft,m.offsetTop]; }; keep();
     bg.addEventListener("pointerdown",()=>front(bg),true);
     const bar=m.querySelector(".row"); if(!bar) return;
     bar.classList.add("drag-bar");
@@ -299,10 +304,13 @@
       const sx=e.clientX,sy=e.clientY,ox=m.offsetLeft,oy=m.offsetTop;
       bar.setPointerCapture(e.pointerId); m.classList.add("dragging");
       const mv=ev=>{m.style.left=Math.max(-w+80,Math.min(innerWidth-80,ox+ev.clientX-sx))+"px";m.style.top=Math.max(0,Math.min(innerHeight-40,oy+ev.clientY-sy))+"px";};
-      const up=()=>{bar.removeEventListener("pointermove",mv);bar.removeEventListener("pointerup",up);m.classList.remove("dragging");};
+      const up=()=>{bar.removeEventListener("pointermove",mv);bar.removeEventListener("pointerup",up);m.classList.remove("dragging");keep();};
       bar.addEventListener("pointermove",mv); bar.addEventListener("pointerup",up);
     });
   }
+  /* אם הכרטיס כבר פתוח: מביאים אותו לקדמה ומבליטים לרגע, במקום לפתוח עוד אחד */
+  window.focusCard=key=>{const e=document.querySelector(`.modal-bg[data-key="${CSS.escape(key)}"]`); if(!e) return false; front(e);
+    const m=e.querySelector(".modal"); if(m){m.classList.remove("pulse"); void m.offsetWidth; m.classList.add("pulse");} return true;};
   new MutationObserver(ms=>{for(const r of ms) for(const el of r.addedNodes) if(el.nodeType===1&&el.classList.contains("modal-bg")) floatify(el);})
     .observe(document.body||document.documentElement,{childList:true});
   /* Esc סוגר רק את החלון העליון */
@@ -765,7 +773,8 @@ function statCards(items,active,le){
 }
 function bindStats(){
   document.querySelectorAll("[data-stat]").forEach(b=>b.onclick=()=>{const x=S.statL[+b.dataset.stat];
-    const bg=document.createElement("div"); bg.className="modal-bg";
+    if(window.focusCard&&focusCard("stat:"+x.k)) return;
+    const bg=document.createElement("div"); bg.className="modal-bg"; bg.dataset.key="stat:"+x.k;
     bg.innerHTML=`<div class="modal" role="dialog" aria-label="${esc(x.label)}" style="max-width:720px">
       <div class="row"><h2 class="grow">${esc(x.label)} · ${x.n}</h2><button class="ghost" id="x">סגור ✕</button></div>
       ${x.rows.length?`<ul class="stat-list">${x.rows.map((r,rx)=>`<li>${r.gk?`<button type="button" class="linkish" data-goto="${rx}" title="להציג את המשימה בלוח הבוקר">${heb(r.t)}</button>`:r.pid?`<button type="button" class="linkish" data-open="${esc(r.pid)}">${heb(r.t)}</button>`:`<b>${heb(r.t)}</b>`}${r.sub?`<div class="muted">${heb(r.sub)}</div>`:""}</li>`).join("")}</ul>`:`<p class="muted">אין פריטים.</p>`}
@@ -788,8 +797,9 @@ const tyCls=v=>v===""?"":v==="מרפאה"?"pr-warn":v==="ניתוח"?"ty-acc":v=
 const prCls=v=>v===""?"":(+v>=5?"pr-bad":+v>=4?"pr-warn":"pr-gray");
 /* כרטיס משימה: פרטים, עריכה, סימון כבוצע או פתיחה מחדש, ביטול */
 function openTask(id){
+  if(window.focusCard&&focusCard("task:"+id)) return;
   const t=S.tasks.find(x=>x.id===id); if(!t) return;
-  const bg=document.createElement("div"); bg.className="modal-bg";
+  const bg=document.createElement("div"); bg.className="modal-bg"; bg.dataset.key="task:"+id;
   const p=paperById(t.paper);
   bg.innerHTML=`<div class="modal" role="dialog" aria-label="כרטיס משימה" style="max-width:680px">
     <div class="row"><h2 class="grow">כרטיס משימה</h2>${t.status==="done"?`<span class="pill ok">בוצע${t.done_at?" · "+esc(dmy(t.done_at)):""}</span>`:`<span class="pill gray">פתוחה</span>`}<button class="ghost" id="x">סגור ✕</button></div>
@@ -875,9 +885,9 @@ function renderMorning(){
   <div class="card">
     <div class="row"><h2 class="grow">מה עושים היום</h2>${anyF?`<button class="ghost" id="mfclear">לנקות סינון</button>`:""}<button class="sec" id="madd" aria-expanded="${S.mAdd?"true":"false"}">${S.mAdd?"סגירה":"+ משימה חדשה"}</button></div>
     ${S.mAdd?addTaskForm():""}
-    <table class="mtable"><thead><tr>${MCOLS.map(([c,l])=>c==="stage"?`<th>שלב</th>`:
-      `<th><button class="th-sort ${SO.col===c?"on":""}" data-sort="${c}" title="מיון">${l}<span class="th-ar">${SO.col===c?(SO.dir<0?"▼":"▲"):"↕"}</span></button></th>`).join("")}<th></th></tr>
-      <tr class="th-filters">${MCOLS.map(([c])=>`<td>${filt[c]}</td>`).join("")}<td></td></tr></thead><tbody>
+    <table class="mtable"><thead><tr>${MCOLS.map(([c,l])=>c==="stage"?`<th class="th-col">שלב</th>`:
+      `<th class="th-col"><button class="th-sort ${SO.col===c?"on":""}" data-sort="${c}" title="מיון">${l}<span class="th-ar">${SO.col===c?(SO.dir<0?"▼":"▲"):"↕"}</span></button><div class="th-fw">${filt[c]}</div></th>`).join("")}<th></th></tr>
+      </thead><tbody>
     ${rows.map((r,rx)=>{const i=r.cur; const pos=i.done?`בוצעה ${r.x+1}/${r.nDone}`:`${r.x-r.nDone+1}/${r.nOpen}`;
       return `<tr data-gk="${esc(r.k)}">
       <td>${prBadge(i.pr)}</td>
@@ -1017,6 +1027,7 @@ async function newPaper(){
 
 /* ---- מסך מאמר ---- */
 function openPaper(id){
+  if(window.focusCard&&focusCard("paper:"+id)) return;
   const p=paperById(id); if(!p) return;
   const st=stageOf(p.stage); const g=(p.gates||{})[p.stage]||{};
   const auto={};
@@ -1026,7 +1037,7 @@ function openPaper(id){
     if(p.stage===9) auto["must-"+(stageOf(9).must.length-1)]=!!(last&&last.status!=="under_review"); }
   const checked=k=>auto[k]!==undefined?auto[k]:!!g[k];
   const allMust=st.must.every((_,i)=>checked("must-"+i));
-  const bg=document.createElement("div"); bg.className="modal-bg";
+  const bg=document.createElement("div"); bg.className="modal-bg"; bg.dataset.key="paper:"+id;
   const $=sel=>bg.querySelector(sel)||document.querySelector(sel); /* כמה כרטיסים פתוחים: כל כרטיס קורא את השדות שלו */
   bg.innerHTML=`<div class="modal">
     <div class="row"><h2 class="grow">${esc(p.title)}</h2>${ENG?`<button class="send" id="askthis">שאל את קלוד</button>`:""}<button class="ghost" id="x">סגור ✕</button></div>
