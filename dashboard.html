@@ -296,7 +296,7 @@ async function switchProject(id){
   const e=S.projects.find(p=>p.id===id); if(!e) return;
   const prev=S.project, prevProj=PROJ;
   if(!ENG){ const h=await projHandle(e); if(!h) return; PROJ=h; }
-  S.project=id; lsSet("rh.project",id); S.chatKey="_main";
+  S.project=id; lsSet("rh.project",id); if(S.chatKey!=="_training") S.chatKey="_main";  /* ההדרכה נשארת פתוחה גם כשעוברים לפרויקט התרגול */
   try{ await loadAll(); }catch(err){
     alert("שגיאה בקריאת תיקיית הפרויקט. נשארים בפרויקט הקודם.\n"+err.message);
     S.project=prev; PROJ=prevProj; lsSet("rh.project",prev); try{ await loadAll(); }catch(e2){}
@@ -474,7 +474,7 @@ function setupCard(){
   const s=setupOpen(); if(!s) return "";
   const cur=SETUP_STEPS.findIndex(([k])=>s[k]!=="done");
   const btns=k=>k==="data"
-    ?`<button data-setup="file">הוספת קובץ נתונים</button>${s.data==="doing"?` <button class="sec" data-setup="data">להמשיך עם קלוד</button>`:""}`
+    ?`<button data-setup="file">הוספת קובץ נתונים</button> <button class="sec" data-setup="data">להמשיך עם קלוד</button>`  /* גם לקובץ שכבר ממתין בתיבת הקליטה (למשל מהלפטופ, בלי קובץ מקומי) */
     :`<button data-setup="${k}">להמשיך עם קלוד</button>`;
   return `<div class="card" id="setupcard"><h2>הקמת הפרויקט</h2>
     <p class="muted">ארבעה שלבים לפי הסדר: קודם הנתונים, אחר כך מפתח הנתונים, ורק אז המאמרים והמקורות.</p>
@@ -1039,18 +1039,26 @@ const SHORTCUTS_ALL=[
   ["בדיקת שער","בדוק את השער של השלב הנוכחי לפי claude-commands/gate.md."],
   ["הרצת ניתוח","הרץ את ניתוחי המאמר לפי claude-commands/analyze.md והסבר את התוצאות בעברית פשוטה."],
   ["טיוטת פרק","עזור לי לנסח פרק לפי claude-commands/draft.md. קודם שאל אותי איזה פרק."]];
-const shortcuts=()=>SHORTCUTS_ALL.filter(s=>!(isGeneral()&&s[0]==="סריקת נתונים"));
+/* שיחת ההדרכה: קבצי המדריך נמצאים בתיקיית המערכת, לכן היא תמיד רצה בפרויקט המרפאה, בכל פרויקט פתוח */
+const TRAINING_SHORTCUTS=[["מתחילים","מתחילים"],["איפה עצרנו?","איפה עצרנו?"]];
+const isTraining=()=>S.chatKey==="_training";
+const trainingOk=()=>!!(RUN.info&&RUN.info.training);
+const chatProject=()=>isTraining()?"clinic":(S.project||"clinic");
+const shortcuts=()=>isTraining()?TRAINING_SHORTCUTS:SHORTCUTS_ALL.filter(s=>!(isGeneral()&&s[0]==="סריקת נתונים"));
 S.chatKey=S.chatKey||"_main";
 function askCard(){
   if(!ENG) return `<div class="card"><h2>שיחה עם קלוד</h2><p class="muted">זמין רק כשהלוח פתוח דרך המנוע: במחשב בבית, או מרחוק דרך הכתובת של השרת.</p></div>`;
-  const opts=[["_main","כללי (בלי מאמר)"],...S.papers.filter(p=>p.status==="active"||p.status==="paused").map(p=>[p.id,p.short||short(p.title)])];
+  /* מנוע ישן (לפני ההדרכה) היה מריץ הודעת הדרכה כשיחה כללית: לכן רק כשהמנוע מודיע שהוא תומך */
+  if(isTraining()&&!trainingOk()) S.chatKey="_main";
+  const opts=[["_main","כללי (בלי מאמר)"],["_training",trainingOk()?"הדרכה":"הדרכה (אחרי הפעלה מחדש של המנוע בבית)"],...S.papers.filter(p=>p.status==="active"||p.status==="paused").map(p=>[p.id,p.short||short(p.title)])];
   return `<div class="chat">
     <div class="chat-h"><b>שיחה עם קלוד</b>
-      <select id="chatsel">${opts.map(([v,l])=>`<option value="${esc(v)}" ${v===S.chatKey?"selected":""}>${esc(l)}</option>`).join("")}</select>
+      <select id="chatsel">${opts.map(([v,l])=>`<option value="${esc(v)}" ${v===S.chatKey?"selected":""} ${v==="_training"&&!trainingOk()?"disabled":""}>${esc(l)}</option>`).join("")}</select>
       <span class="grow"></span><span class="muted">${LOCALHOST?"רץ במחשב הזה":"רץ במחשב בבית"}</span>
       <button class="ghost" id="chatnew" title="קלוד מתחיל מחדש, בלי ההקשר של השיחה הזו. היומן נשאר.">שיחה חדשה</button></div>
     <div class="chat-log" id="chatlog"><p class="muted">טוען…</p></div>
     <div class="chat-f">
+      ${isTraining()?`<div class="muted" style="margin-bottom:6px">ההדרכה מתקדמת צעד אחד בכל פעם. אחרי כל צעד כותבים מה רואים.</div>`:""}
       <div class="chips">${shortcuts().map(([l],i)=>`<button data-sc="${i}">${esc(l)}</button>`).join("")}</div>
       <div class="row" style="align-items:flex-end"><textarea id="chatin" class="grow" placeholder="מה לעשות?"></textarea><button class="send" id="chatsend">שלח</button></div>
     </div></div>`;
@@ -1071,7 +1079,7 @@ async function chatApi(path,opt={}){
 async function loadChat(){
   const box=$("#chatlog"); if(!box) return;
   try{
-    const r=await chatApi("/chat?key="+encodeURIComponent(S.chatKey)+"&"+projQ());
+    const r=await chatApi("/chat?key="+encodeURIComponent(S.chatKey)+"&project="+encodeURIComponent(chatProject()));
     const ms=r.messages||[];
     box.innerHTML=ms.length?ms.map(bubble).join(""):`<p class="muted">עוד אין שיחה כאן. אפשר לכתוב בקשה, או לבחור אחד הקיצורים.</p>`;
     bindChatButtons(); box.scrollTop=box.scrollHeight;
@@ -1089,7 +1097,8 @@ async function sendChat(text){
   box.insertAdjacentHTML("beforeend",bubble({role:"user",text})+`<div class="chat-prog" id="chatprog">שולח…</div>`);
   box.scrollTop=box.scrollHeight; btn.disabled=true; $("#chatin").value="";
   try{
-    const r=await chatApi("/claude",{method:"POST",body:JSON.stringify({prompt:text,paper:S.chatKey==="_main"?"":S.chatKey,project:S.project})});
+    const r=await chatApi("/claude",{method:"POST",body:JSON.stringify(isTraining()?{prompt:text,paper:"",chat:"_training",project:"clinic"}
+      :{prompt:text,paper:S.chatKey==="_main"?"":S.chatKey,project:S.project})});
     if(!r.job) throw new Error(r.error||"המנוע סירב");
     const t0=Date.now();
     const poll=async()=>{
@@ -1104,12 +1113,12 @@ async function sendChat(text){
 }
 function bindChat(){
   if(!$("#chatlog")) return;
-  $("#chatsel").onchange=e=>{S.chatKey=e.target.value;loadChat();};
+  $("#chatsel").onchange=e=>{S.chatKey=e.target.value;renderClaude();};  /* קיצורים ושורת ההסבר תלויים בשיחה */
   $("#chatsend").onclick=()=>sendChat($("#chatin").value);
   $("#chatin").onkeydown=e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();sendChat($("#chatin").value);}};
   document.querySelectorAll("[data-sc]").forEach(b=>b.onclick=()=>sendChat(shortcuts()[+b.dataset.sc][1]));
   $("#chatnew").onclick=async()=>{ if(!confirm("להתחיל שיחה חדשה? קלוד לא יזכור את השיחה הזו, אבל היומן של המאמר נשאר.")) return;
-    await chatApi("/chat/reset?key="+encodeURIComponent(S.chatKey)+"&"+projQ(),{method:"POST",body:JSON.stringify({project:S.project})}); loadChat(); };
+    await chatApi("/chat/reset?key="+encodeURIComponent(S.chatKey)+"&project="+encodeURIComponent(chatProject()),{method:"POST",body:JSON.stringify({project:chatProject()})}); loadChat(); };
   loadChat();
 }
 function openChatFor(id){ S.chatKey=id; S.tab="claude"; document.querySelector(".modal-bg")?.remove(); renderNav(); render(); }
