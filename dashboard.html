@@ -44,13 +44,13 @@
   .done-btn.is-done{display:inline-block;background:var(--ok);color:#fff;border:1px solid var(--ok);border-radius:8px;padding:4px 10px;font-size:13px;font-weight:600;white-space:nowrap}
   button.done-btn.is-done:hover{background:var(--ok);filter:brightness(1.08);border-color:var(--ok)}
   tr.row-done td{background:var(--ok-soft)} tr.row-done b{color:var(--muted);font-weight:500}
-  .focus{border-inline-start:4px solid var(--accent)}
-  .focus.is-done{border-inline-start-color:var(--ok)}
-  .focus-top{display:flex;justify-content:space-between;gap:12px;font-size:13px;margin-bottom:8px}
-  .focus-text{font-size:17px;font-weight:600;margin:8px 0 4px;line-height:1.5}
-  .focus.is-done .focus-text{color:var(--muted)}
-  .focus-nav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;flex-wrap:wrap}
-  .focus-nav .done-btn{font-size:14px;padding:7px 16px}
+  .row-nav{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+  .row-pos{font-size:11px;color:var(--muted);text-align:center;margin-top:3px}
+  .arr{background:#fff;color:var(--accent);border:1px solid var(--line);border-radius:8px;width:28px;height:28px;padding:0;font-size:17px;line-height:1;display:inline-flex;align-items:center;justify-content:center;transition:background-color 150ms ease,border-color 150ms ease,transform 150ms cubic-bezier(0.23,1,0.32,1)}
+  .arr:disabled{opacity:.3;cursor:default}
+  .arr.go{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .arr:not(:disabled):active{transform:scale(0.94)}
+  @media (hover:hover) and (pointer:fine){ .arr:not(:disabled):not(.go):hover{border-color:var(--accent);background:#f3f7fb} }
   .nav-arrow{background:#fff;color:var(--accent);border:1px solid var(--line);border-radius:8px;padding:7px 14px;font-size:14px;transition:background-color 150ms ease,border-color 150ms ease,transform 150ms cubic-bezier(0.23,1,0.32,1)}
   .nav-arrow:disabled{opacity:.4;cursor:default}
   .nav-arrow.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
@@ -607,27 +607,21 @@ function renderMorning(){
   const f=S.morningFilter||"הכל"; const byF=i=>f==="הכל"||i.type===f;
   const shown=items.filter(byF);
   const done=doneItems().filter(byF);
-  const lt=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
-  const doneToday=done.filter(i=>i.at===today()||i.at===lt).reverse();
-  /* כרטיס המשימה הנוכחית: אחורה עוברים על מה שבוצע, קדימה על מה שפתוח */
-  const seq=done.concat(shown);
-  let fx=seq.findIndex(i=>itemKey(i)===S.focusKey); if(fx<0) fx=Math.min(done.length,seq.length-1);
-  const cur=seq[fx];
+  /* שורה לכל מאמר (ומשימות בלי מאמר לפי סוג). החצים בשורה עוברים בין המשימות שלו:
+     ימינה (›) אחורה למה שכבר בוצע, שמאלה (‹) קדימה למשימות הפתוחות האחרות */
+  const gk=i=>i.paper?"p:"+i.paper.id:"t:"+i.type;
+  const groups=new Map();
+  for(const i of shown){ if(!groups.has(gk(i))) groups.set(gk(i),{open:[],done:[]}); groups.get(gk(i)).open.push(i); }
+  for(const i of done){ const g=groups.get(gk(i)); if(g) g.done.push(i); }
+  S.rowPos=S.rowPos||{};
+  const rows=[...groups.entries()].map(([k,g])=>{
+    const seq=g.done.concat(g.open);
+    let x=seq.findIndex(i=>itemKey(i)===S.rowPos[k]); if(x<0) x=g.done.length;
+    return {k,seq,x,cur:seq[x],nOpen:g.open.length,nDone:g.done.length,top:g.open[0]};
+  });
   const le=latestExport();
   const active=S.papers.filter(p=>p.status==="active");
   const byWork=t=>items.filter(i=>i.type===t).length;
-  const focus=cur?`<div class="card focus ${cur.done?"is-done":""}">
-    <div class="focus-top"><span class="muted">${cur.done?`בוצע${cur.at?" · "+esc(dmy(cur.at)):""}`:"המשימה הנוכחית"}</span>
-      <span class="muted">${fx<done.length?`בוצעה ${fx+1} מתוך ${done.length}`:`${fx-done.length+1} מתוך ${shown.length} פתוחות`}</span></div>
-    <div class="focus-body">${prBadge(cur.pr)} ${itemType(cur)} ${cur.paper?paperChip(cur.paper):""}
-      <div class="focus-text">${heb(cur.text)}</div>
-      ${cur.extra.length?`<div class="muted">חסר: ${cur.extra.map(heb).join(" · ")}</div>`:""}</div>
-    <div class="focus-nav">
-      <button class="nav-arrow" id="fprev" ${fx<=0?"disabled":""} aria-label="המשימה הקודמת">→ הקודמת</button>
-      ${doneBtn(cur,`id="fdone"`)}
-      <button class="nav-arrow ${cur.done&&fx<seq.length-1?"primary":""}" id="fnext" ${fx>=seq.length-1?"disabled":""} aria-label="המשימה הבאה">הבאה ←</button>
-    </div></div>`:"";
-  const rows=shown.concat(doneToday);
   $("#app").innerHTML=`${setupCard()}
   <div class="stats">
     <div class="stat"><span class="muted">מאמרים פעילים</span><b>${active.length}</b></div>
@@ -636,32 +630,32 @@ function renderMorning(){
     ${isGeneral()?"":`<div class="stat"><span class="muted">משימות למרפאה</span><b>${byWork("מרפאה")}</b></div>`}
     <div class="stat"><span class="muted">ימים מאז הייצוא האחרון</span><b>${le?daysSince(le.uploaded_at):"—"}</b></div>
   </div>
-  ${focus}
   <div class="card">
     <div class="row"><h2 class="grow">מה עושים היום</h2>
       <select id="mf">${types.map(t=>`<option ${t===f?"selected":""}>${t}</option>`).join("")}</select></div>
     <table><thead><tr><th>עדיפות</th><th>סוג</th><th>פעולה</th><th>מאמר</th><th>שלב</th><th>ימים</th><th></th></tr></thead><tbody>
-    ${rows.map((i,ix)=>`<tr class="${i.done?"row-done":""}">
+    ${rows.map((r,rx)=>{const i=r.cur; const pos=i.done?`בוצעה ${r.x+1}/${r.nDone}`:`${r.x-r.nDone+1}/${r.nOpen}`;
+      return `<tr class="${i.done?"row-done":""}">
       <td>${prBadge(i.pr)}</td>
       <td>${itemType(i)}</td>
-      <td><b>${heb(i.text)}</b>${i.extra.length?`<div class="muted">חסר: ${i.extra.map(heb).join(" · ")}</div>`:""}${i.flag?`<div><span class="pill warn">${heb(i.flag)}</span></div>`:""}</td>
+      <td><b>${heb(i.text)}</b>${i.done&&i.at?` <span class="muted">· ${esc(dmy(i.at))}</span>`:""}${i.extra.length?`<div class="muted">חסר: ${i.extra.map(heb).join(" · ")}</div>`:""}${i.flag?`<div><span class="pill warn">${heb(i.flag)}</span></div>`:""}</td>
       <td>${i.paper?paperChip(i.paper):"—"}</td>
       <td>${i.paper?miniStages(i.paper.stage):""}</td>
       <td>${i.done?"":(i.age??"")}</td>
-      <td>${doneBtn(i,`data-row="${ix}"`)}</td></tr>`).join("")}
+      <td><div class="row-nav">
+        <button class="arr" data-mv="${rx}:-1" ${r.x<=0?"disabled":""} title="אחורה: משימות שכבר בוצעו" aria-label="המשימה הקודמת">›</button>
+        ${doneBtn(i,`data-row="${rx}"`)}
+        <button class="arr ${i.done&&r.x<r.seq.length-1?"go":""}" data-mv="${rx}:1" ${r.x>=r.seq.length-1?"disabled":""} title="קדימה: משימות פתוחות נוספות" aria-label="המשימה הבאה">‹</button>
+      </div>${r.seq.length>1?`<div class="row-pos">${pos}</div>`:""}</td></tr>`;}).join("")}
     </tbody></table>
-    ${shown.length?"":`<p class="muted">אין משימות פתוחות.</p>`}
+    ${rows.length?"":`<p class="muted">אין משימות פתוחות.</p>`}
   </div>`;
   $("#mf").onchange=e=>{S.morningFilter=e.target.value;renderMorning();};
   bindOpen(); bindSetup();
-  const act=async(i)=>{ const k=i.done?await reopen(i):await markDone(i); if(k===null&&!i.done) return;
-    if(k) S.focusKey=k; toast(i.done?"נפתח מחדש":"סומן כבוצע"); renderMorning(); };
-  document.querySelectorAll("[data-row]").forEach(b=>b.onclick=()=>act(rows[+b.dataset.row]));
-  if(cur){
-    const go=d=>{const n=seq[fx+d]; if(n){S.focusKey=itemKey(n); renderMorning();}};
-    $("#fprev").onclick=()=>go(-1); $("#fnext").onclick=()=>go(1);
-    const fd=$("#fdone"); if(fd&&fd.tagName==="BUTTON") fd.onclick=()=>act(cur);
-  }
+  document.querySelectorAll("[data-mv]").forEach(b=>b.onclick=()=>{const [rx,d]=b.dataset.mv.split(":").map(Number);const r=rows[rx];const n=r.seq[r.x+d];if(n){S.rowPos[r.k]=itemKey(n);renderMorning();}});
+  document.querySelectorAll("[data-row]").forEach(b=>b.onclick=async()=>{const r=rows[+b.dataset.row];const i=r.cur;
+    const k=i.done?await reopen(i):await markDone(i); if(k===null&&!i.done) return;
+    if(k) S.rowPos[r.k]=k; toast(i.done?"נפתח מחדש":"סומן כבוצע"); renderMorning();});
 }
 const short=t=>t.length>48?t.slice(0,46)+"…":t;
 /* כפתור מאמר: שם קצר, הכותרת המלאה בריחוף */
