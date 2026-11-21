@@ -730,13 +730,16 @@ function bindStats(){
     bg.querySelector("#x").focus();
   });
 }
+/* צבעי עדיפות וסוג, כמו בטבלה */
+const tyCls=v=>v===""?"":v==="מרפאה"?"pr-warn":v==="ניתוח"?"ty-acc":v==="כתיבה"?"ty-ok":"pr-gray";
+const prCls=v=>v===""?"":(+v>=5?"pr-bad":+v>=4?"pr-warn":"pr-gray");
 function addTaskForm(){
   return `<div class="add-task">
     <div class="row">
       <input id="tt" class="grow" placeholder="מה צריך לעשות" aria-label="המשימה">
-      <select id="ty" aria-label="סוג">${S.workTypes.map(w=>`<option ${w==="מרפאה"?"selected":""}>${w}</option>`).join("")}</select>
+      <select id="ty" class="th-f pr-warn" style="width:auto" aria-label="סוג">${S.workTypes.map(w=>`<option ${w==="מרפאה"?"selected":""}>${w}</option>`).join("")}</select>
       <select id="tp" aria-label="מאמר"><option value="">ללא מאמר</option>${S.papers.filter(p=>p.status==="active").map(p=>`<option value="${p.id}">${esc(short(p.title))}</option>`).join("")}</select>
-      <select id="tpr" title="עדיפות" aria-label="עדיפות">${[1,2,3,4,5].map(n=>`<option ${n===3?"selected":""}>${n}</option>`).join("")}</select>
+      <select id="tpr" class="th-f pr-gray" style="width:auto" title="עדיפות" aria-label="עדיפות">${[1,2,3,4,5].map(n=>`<option ${n===3?"selected":""}>${n}</option>`).join("")}</select>
       <button id="tadd">להוסיף</button>
     </div>
     <input id="tnote" style="width:100%;margin-top:8px" placeholder="הערה או הרעיון שממנו זה עלה (לא חובה)" aria-label="הערה">
@@ -769,9 +772,7 @@ function renderMorning(){
   if(S.mKeep&&S.mOrder){const o=new Map(S.mOrder.map((k,ix)=>[k,ix]));rows.sort((a,b)=>(o.has(a.k)?o.get(a.k):1e9)-(o.has(b.k)?o.get(b.k):1e9));}
   S.mKeep=false; S.mOrder=rows.map(r=>r.k);
   const uniq=(c)=>[...new Set(items.map(i=>String(mVal(i,c))))].sort((a,b)=>c==="pr"?b-a:a.localeCompare(b,"he"));
-  const tyCls=v=>v===""?"":v==="מרפאה"?"pr-warn":v==="ניתוח"?"ty-acc":v==="כתיבה"?"ty-ok":"pr-gray";
-  const prCls=v=>v===""?"":(+v>=5?"pr-bad":+v>=4?"pr-warn":"pr-gray");
-  const sel=(c,opts)=>`<select class="th-f ${c==="pr"?prCls(F.pr):c==="type"?tyCls(F.type):""}" data-f="${c}" aria-label="סינון">${[["","הכל"],...opts].map(([v,l])=>`<option value="${esc(v)}" ${F[c]===v?"selected":""}>${esc(l)}</option>`).join("")}</select>`;
+    const sel=(c,opts)=>`<select class="th-f ${c==="pr"?prCls(F.pr):c==="type"?tyCls(F.type):""}" data-f="${c}" aria-label="סינון">${[["","הכל"],...opts].map(([v,l])=>`<option value="${esc(v)}" ${F[c]===v?"selected":""}>${esc(l)}</option>`).join("")}</select>`;
   const filt={pr:sel("pr",uniq("pr").map(v=>[v,v])),type:sel("type",uniq("type").map(v=>[v,v])),
     text:`<input class="th-f" data-f="text" type="search" placeholder="חיפוש" value="${esc(F.text)}" aria-label="חיפוש בפעולה">`,
     paper:sel("paper",uniq("paper").map(v=>[v,v])),stage:"",age:sel("age",[["7","מעל 7"],["30","מעל 30"]])};
@@ -815,6 +816,8 @@ function renderMorning(){
       S.tasks.push(nt); await saveTasks(); S.mAdd=false;
       /* השורה של המשימה החדשה מציגה אותה */
       const pp=paperById(nt.paper); S.rowPos=S.rowPos||{}; S.rowPos[pp?"p:"+pp.id:"t:"+nt.type]=itemKey({kind:"task",done:false,tid:nt.id,paper:pp,text:nt.title});toast("המשימה נוספה");renderMorning();};
+    const paint=()=>{$("#ty").className="th-f "+tyCls($("#ty").value);$("#tpr").className="th-f "+prCls($("#tpr").value);};
+    $("#ty").onchange=paint; $("#tpr").onchange=paint; paint();
     $("#tadd").onclick=add; $("#tt").onkeydown=e=>{if(e.key==="Enter")add();}; }
   const cl=$("#mfclear"); if(cl) cl.onclick=()=>{S.mf={pr:"",type:"",text:"",paper:"",age:""};renderMorning();};
   document.querySelectorAll("[data-mv]").forEach(b=>b.onclick=()=>{const [rx,d]=b.dataset.mv.split(":").map(Number);const r=rows[rx];const n=r.seq[r.x+d];if(n){S.rowPos[r.k]=itemKey(n);S.mKeep=true;renderMorning();}});
