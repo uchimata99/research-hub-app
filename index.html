@@ -99,6 +99,12 @@
   .sw input:focus-visible+.sw-track{outline:2px solid #fff;outline-offset:2px}
   .sw input:disabled+.sw-track{opacity:.6}
   .sw-sub{opacity:.75;font-size:12px}
+  #srvsw{display:inline-flex;align-items:center;gap:10px}
+  .cl-ico{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:var(--claude);flex:none}
+  .cl-ico:hover{filter:brightness(1.1)}
+  .cl-ico svg{width:18px;height:18px}
+  .eng-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#9aa5b1;margin-inline-end:6px;vertical-align:middle}
+  .eng-dot.ok{background:#4cc47e}
   .proj{position:relative}
   .proj-btn{background:#ffffff26;color:#fff;border:1px solid #ffffff55;border-radius:8px;padding:4px 12px;font-size:14px}
   .proj-menu{position:absolute;top:calc(100% + 6px);inset-inline-start:0;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 20px #0003;min-width:210px;padding:6px;z-index:25}
@@ -1169,8 +1175,11 @@ async function runnerCheck(){
   }
   try{const r=await fetch(RUN.url+"/status",{cache:"no-store"});RUN.ok=r.ok;RUN.info=await r.json();}catch(e){RUN.ok=false;}
   const el=$("#eng"); const m=RUN.ok&&RUN.info&&S.machines?S.machines[RUN.info.machine]:null;
-  if(el) el.innerHTML=(RUN.ok?"מנוע הניתוח: מחובר ✓":"מנוע הניתוח: כבוי")+(m&&m.main_session?` <a class="claude-pill" href="${esc(m.main_session)}">קלוד · שיחה ראשית</a>`:"")+modeCtl();
-  const sw=$("#srvsw"); if(sw){ sw.innerHTML=srvSwitch(); const i=$("#modesw"); if(i) i.onchange=switchMode; }
+  if(el) el.innerHTML=`<span class="eng-dot ${RUN.ok?"ok":""}"></span>`+(RUN.ok?"מנוע מחובר":"מנוע כבוי")+modeCtl();
+  /* קישור לשיחה הראשית פותח את אפליקציית קלוד במחשב שעליו רץ הדפדפן, לכן לא מוצג למי שמחובר מרחוק */
+  const remote=ENG&&!LOCALHOST;
+  const cl=(m&&m.main_session&&!remote)?`<a class="cl-ico" href="${esc(m.main_session)}" title="קלוד · שיחה ראשית" aria-label="קלוד · שיחה ראשית">${CLAUDE_SVG}</a>`:"";
+  const sw=$("#srvsw"); if(sw){ sw.innerHTML=cl+srvSwitch(); const i=$("#modesw"); if(i) i.onchange=switchMode; }
   return RUN.ok;
 }
 /* מצב שרת או בית של המחשב בבית. מרחוק (דרך המנהרה) רק מציגים, כדי לא לסגור את החיבור של עצמך */
@@ -1180,13 +1189,14 @@ function modeCtl(){
   if(!LOCALHOST) return ` · <span class="pill ok">מחובר מרחוק לשרת בבית</span>`;
   return "";
 }
+const CLAUDE_SVG='<svg viewBox="0 0 24 24" aria-hidden="true"><g stroke="#fff" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="3" x2="12" y2="21"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="5.6" y1="5.6" x2="18.4" y2="18.4"/><line x1="18.4" y1="5.6" x2="5.6" y2="18.4"/></g></svg>';
 /* מתג מצב שרת, בקצה השמאלי של הכותרת. רק במחשב הבית עצמו */
 let MODE_SWITCHING=null;
 function srvSwitch(){
   if(!LOCALHOST||!RUN.ok||!RUN.info||RUN.info.mode===undefined) return "";
   const srv=RUN.info.mode==="server";
-  const sub=MODE_SWITCHING?(MODE_SWITCHING==="server"?"מפעיל…":"מכבה…"):(srv?"פועל":"כבוי");
-  return `<label class="sw" title="מפעילים פעם אחת ומשאירים את המחשב דלוק. כשהמתג פועל, המחשב לא נרדם והלוח זמין מרחוק עם קוד לדוא״ל. אם המחשב הופעל מחדש כשהמתג פעל, מצב השרת חוזר לבד אחרי הכניסה לחלונות."><input type="checkbox" id="modesw" role="switch" ${srv?"checked":""} ${MODE_SWITCHING?"disabled":""} aria-label="מצב שרת"><span class="sw-track"><span class="sw-knob"></span></span><span>מצב שרת</span><span class="sw-sub">${sub}</span></label>`;
+  const sub=MODE_SWITCHING?(MODE_SWITCHING==="server"?"מפעיל…":"מכבה…"):"";
+  return `<label class="sw" title="מפעילים פעם אחת ומשאירים את המחשב דלוק. כשהמתג פועל, המחשב לא נרדם והלוח זמין מרחוק עם קוד לדוא״ל. אם המחשב הופעל מחדש כשהמתג פעל, מצב השרת חוזר לבד אחרי הכניסה לחלונות."><input type="checkbox" id="modesw" role="switch" ${srv?"checked":""} ${MODE_SWITCHING?"disabled":""} aria-label="מצב שרת"><span class="sw-track"><span class="sw-knob"></span></span><span>מצב שרת</span>${sub?`<span class="sw-sub">${sub}</span>`:""}</label>`;
 }
 async function switchMode(){
   const to=RUN.info.mode==="server"?"home":"server";
