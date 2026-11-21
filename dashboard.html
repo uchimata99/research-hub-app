@@ -53,6 +53,9 @@
   .ltr{direction:ltr;unicode-bidi:isolate;font-family:Consolas,monospace;font-size:13px}
   .drop{border:2px dashed #b9c6d4;border-radius:12px;padding:26px;text-align:center;background:#fbfcfe}
   .drop.over{background:var(--accent-soft)}
+  .setup-steps{list-style:none;padding:0;margin:8px 0 0}
+  .setup-steps li{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+  .setup-steps li.cur{border-color:var(--accent);background:var(--accent-soft)}
   .check{display:flex;gap:8px;align-items:flex-start;padding:5px 0}
   .check input{margin-top:3px}
   pre.code{direction:ltr;text-align:left;background:#1f2328;color:#e6edf3;padding:10px 12px;border-radius:8px;overflow:auto;margin:6px 0;font-size:13px}
@@ -86,6 +89,13 @@
   #demobar{background:#f5c542;color:#3a2c00;text-align:center;font-weight:600;padding:6px 12px;font-size:14px}
   .mode-btn{background:#ffffff26;color:#fff;border:1px solid #ffffff55;border-radius:999px;padding:2px 10px;font-size:13px}
   .mode-btn.on{background:#2e7d4f;border-color:#2e7d4f}
+  .proj{position:relative}
+  .proj-btn{background:#ffffff26;color:#fff;border:1px solid #ffffff55;border-radius:8px;padding:4px 12px;font-size:14px}
+  .proj-menu{position:absolute;top:calc(100% + 6px);inset-inline-start:0;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 20px #0003;min-width:210px;padding:6px;z-index:25}
+  .proj-menu button{display:block;width:100%;text-align:right;background:transparent;color:var(--ink);border-radius:6px;padding:6px 10px}
+  .proj-menu button:hover{background:var(--accent-soft)}
+  .proj-menu button.on{font-weight:600;color:var(--accent)}
+  .proj-menu hr{border:0;border-top:1px solid var(--line);margin:6px 0}
   .chat{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card);margin-bottom:16px}
   .chat-h{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line)}
   .chat-log{padding:14px;display:flex;flex-direction:column;gap:12px;max-height:62vh;overflow:auto;background:#fcfbf9}
@@ -128,7 +138,8 @@
 </head>
 <body>
 <header>
-  <h1>מרכז המחקר</h1>
+  <span class="proj hidden" id="proj"></span>
+  <h1 id="h1">מרכז המחקר</h1>
   <nav id="nav"></nav>
   <span class="grow"></span>
   <span class="meta" id="eng"></span>
@@ -144,25 +155,32 @@ function idb(){return new Promise((res,rej)=>{const r=indexedDB.open(DB_NAME,1);
 async function idbGet(k){const d=await idb();return new Promise(r=>{const q=d.transaction(STORE).objectStore(STORE).get(k);q.onsuccess=()=>r(q.result);q.onerror=()=>r(null);});}
 async function idbSet(k,v){const d=await idb();return new Promise(r=>{const t=d.transaction(STORE,"readwrite");t.objectStore(STORE).put(v,k);t.oncomplete=()=>r();});}
 
-let ROOT=null;
+/* ROOT = תיקיית הקוד (מרכז המחקר, שהיא גם פרויקט המרפאה). PROJ = תיקיית הפרויקט הפעיל (במרפאה: אותה תיקייה) */
+let ROOT=null, PROJ=null;
+/* קבצים שתמיד נמצאים בתיקיית הקוד, בכל פרויקט. אותו כלל כמו במנוע */
+const CODE_HOME_RE=/^(config\/(stages|journals|links|machines|packages|projects|server|demo)\.json|library\/(instruments|lutz)\/|templates\/|claude-commands\/|\.runner\/(port|token|installs\.log)$)/;
+function projPath(path){const p=String(path??"").replace(/\\/g,"/");return {home:CODE_HOME_RE.test(p),path:p};}
 /* כשהלוח נפתח דרך המנוע, המנוע קורא וכותב את הקבצים. אחרת: גישת הדפדפן לתיקייה */
 /* רק המנוע מזריק את המפתח לדף, גם כשהוא מוגש מרחוק דרך המנהרה המוגנת (מצב שרת). באתר הציבורי אין מפתח, ולכן בוחרים תיקייה */
 const ENG=!!window.RUNNER_TOKEN&&location.origin!=="null";
+const projQ=()=>"project="+encodeURIComponent(S.project||"clinic");
 async function eng(ep,path,opt={}){
-  const r=await fetch(`/fs/${ep}?path=${encodeURIComponent(path)}`,{cache:"no-store",...opt,headers:{"X-Token":window.RUNNER_TOKEN,...(opt.headers||{})}});
+  const r=await fetch(`/fs/${ep}?path=${encodeURIComponent(path)}&${projQ()}`,{cache:"no-store",...opt,headers:{"X-Token":window.RUNNER_TOKEN,...(opt.headers||{})}});
   if(r.status===403) throw new Error("המנוע הופעל מחדש מאז שהדף נפתח. צריך לרענן את הדף.");
   if(!r.ok){let m=r.status;try{m=(await r.json()).error||m;}catch(e){} const err=new Error(String(m));err.status=r.status;throw err;}
   return r;
 }
 async function readBuf(path){ if(ENG) return (await eng("read",path)).arrayBuffer(); return (await (await fileAt(path)).getFile()).arrayBuffer(); }
-async function dirAt(path,create=false){
-  let d=ROOT; if(!path) return d;
-  for(const part of path.split("/").filter(Boolean)) d=await d.getDirectoryHandle(part,{create});
+/* home: איזו תיקייה (קוד או פרויקט). נקבע לפי הנתיב המלא, כי הכלל מסתיים לפעמים בלוכסן */
+async function dirAt(path,create=false,home){
+  const pp=projPath(path); if(home===undefined) home=projPath(pp.path+"/").home||pp.home;
+  let d=home?ROOT:(PROJ||ROOT); if(!pp.path) return d;
+  for(const part of pp.path.split("/").filter(Boolean)) d=await d.getDirectoryHandle(part,{create});
   return d;
 }
 async function fileAt(path,create=false){
-  const parts=path.split("/"); const name=parts.pop();
-  const d=await dirAt(parts.join("/"),create);
+  const pp=projPath(path); const parts=pp.path.split("/"); const name=parts.pop();
+  const d=await dirAt(parts.join("/"),create,pp.home);
   return d.getFileHandle(name,{create});
 }
 async function exists(path){try{if(ENG){await eng("read",path);return true;}await fileAt(path);return true;}catch(e){return false;}}
@@ -225,7 +243,114 @@ function exportDateFromName(name){
 }
 
 /* ============ מצב ============ */
-const S={stages:[],statuses:{},journals:[],papers:[],tasks:[],log:[],catalog:null,instruments:[],refs:[],tab:"morning"};
+const S={stages:[],statuses:{},journals:[],papers:[],tasks:[],log:[],catalog:null,instruments:[],refs:[],tab:"morning",project:"clinic",projects:[]};
+
+/* ============ פרויקטים ============ */
+const CLINIC={id:"clinic",name:"מרפאה",path:".",kind:"clinic"};
+const curProject=()=>S.projects.find(p=>p.id===S.project)||CLINIC;
+const isGeneral=()=>curProject().kind==="general";
+function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
+function lsSet(k,v){try{localStorage.setItem(k,v);}catch(e){}}
+/* רשימת הפרויקטים: מהמנוע, או מקובץ הרישום בבחירת תיקייה. כל כשל = רק המרפאה, כמו היום */
+async function loadProjects(){
+  let list=null;
+  try{
+    if(ENG){ list=(await chatApi("/projects")).projects;
+      try{S.engProjects=!!(await (await fetch(RUN.url+"/status",{cache:"no-store"})).json()).projects;}catch(e){S.engProjects=false;} }
+    else list=JSON.parse(await readText("config/projects.json"));
+  }catch(e){ list=null; }
+  if(!Array.isArray(list)) list=[];
+  list=list.filter(p=>p&&typeof p.id==="string");
+  if(!list.some(p=>p.id==="clinic")) list.unshift(CLINIC);
+  S.projects=list;
+  const id=lsGet("rh.project");
+  S.project=list.some(p=>p.id===id)?id:"clinic";
+}
+/* הבורר מוצג רק כשיש יותר מפרויקט אחד, או כשהמנוע תומך בפרויקטים (גם בעותק ההדרכה: שם פרויקטי התרגול נשמרים בתוך עותק ההדרכה) */
+const projectsOn=()=>S.projects.length>1||(ENG&&!!S.engProjects);
+/* בחירת תיקייה: לכל פרויקט כללי בוחרים את התיקייה פעם אחת בדפדפן, והיא נשמרת */
+async function projOk(h,id){
+  try{const f=await (await (await h.getDirectoryHandle("config")).getFileHandle("project.json")).getFile();return JSON.parse(await f.text()).id===id;}catch(e){return false;}
+}
+async function projHandle(e){
+  if(e.id==="clinic") return ROOT;
+  const h=await idbGet("proj:"+e.id);
+  if(h){ try{ if(await h.requestPermission({mode:"readwrite"})==="granted"&&await projOk(h,e.id)) return h; }catch(err){} }
+  return new Promise(res=>{
+    const bg=document.createElement("div"); bg.className="modal-bg";
+    bg.innerHTML=`<div class="modal" style="max-width:520px"><h2>תיקיית הפרויקט ${esc(e.name)}</h2>
+      <p>בפעם הראשונה בדפדפן הזה יש לבחור את תיקיית הפרויקט בדרייב.</p><p class="muted">שם התיקייה:</p><p>${ltr(e.id)}</p>
+      <div class="row"><button id="pp">בחירת תיקייה</button><button class="sec" id="pc">ביטול</button></div></div>`;
+    document.body.appendChild(bg);
+    const done=v=>{bg.remove();res(v);};
+    bg.querySelector("#pc").onclick=()=>done(null);
+    bg.querySelector("#pp").onclick=async()=>{
+      try{ const d=await window.showDirectoryPicker({mode:"readwrite"});
+        if(!(await projOk(d,e.id))){toast("זו לא תיקיית הפרויקט הזה");return;}
+        await idbSet("proj:"+e.id,d); done(d);
+      }catch(err){}
+    };
+  });
+}
+async function switchProject(id){
+  const e=S.projects.find(p=>p.id===id); if(!e) return;
+  const prev=S.project, prevProj=PROJ;
+  if(!ENG){ const h=await projHandle(e); if(!h) return; PROJ=h; }
+  S.project=id; lsSet("rh.project",id); S.chatKey="_main";
+  try{ await loadAll(); }catch(err){
+    alert("שגיאה בקריאת תיקיית הפרויקט. נשארים בפרויקט הקודם.\n"+err.message);
+    S.project=prev; PROJ=prevProj; lsSet("rh.project",prev); try{ await loadAll(); }catch(e2){}
+  }
+  renderNav(); render();
+}
+function engineNeeded(html,cmd){
+  const bg=document.createElement("div"); bg.className="modal-bg";
+  bg.innerHTML=`<div class="modal" style="max-width:520px">${html}${cmd?`<div class="cmd"><pre class="code">${esc(cmd)}</pre><button class="sec" id="cc">העתק</button></div>`:""}
+    <div class="row" style="margin-top:10px"><button class="sec" id="x">סגירה</button></div></div>`;
+  document.body.appendChild(bg);
+  bg.querySelector("#x").onclick=()=>bg.remove(); bg.onclick=ev=>{if(ev.target===bg)bg.remove();};
+  const c=bg.querySelector("#cc"); if(c) c.onclick=()=>copy(cmd);
+}
+function projErr(head,msg){
+  msg=String(msg||"");
+  if(/^Folder already exists/i.test(msg)){const m=msg.match(/:\s*(.+)$/);return "התיקייה של הפרויקט כבר קיימת. כנראה הוא נוצר במחשב אחר והדרייב עוד לא סיים לסנכרן. כדאי לחכות לסנכרון ולנסות שוב."+(m?"\n"+m[1]:"");}
+  if(/already exists/i.test(msg)) return "כבר יש פרויקט בשם הזה. אפשר לבחור שם אחר.";
+  return head+(msg?"\n"+msg:"");
+}
+async function newProject(){
+  if(!ENG){ engineNeeded(`<p>יצירת פרויקט חדש דורשת את מנוע הניתוח. אפשר לבקש מקלוד קוד:</p>`,"/new-project"); return; }
+  const name=(prompt("שם הפרויקט:")||"").trim(); if(!name) return;
+  let r; try{ r=await chatApi("/project/new",{method:"POST",body:JSON.stringify({name})}); }catch(e){ r={error:e.message}; }
+  if(!r||!r.id){ alert(projErr("הפרויקט לא נוצר.",r&&r.error)); return; }
+  S.tab="morning"; /* הפרויקט החדש נפתח בלוח הבוקר, עם כרטיס הקמת הפרויקט */
+  await loadProjects(); await switchProject(r.id); toast("הפרויקט נוצר");
+}
+async function renameProject(){
+  const e=curProject();
+  if(!ENG){ engineNeeded(`<p>שינוי שם של פרויקט דורש את מנוע הניתוח.</p>`); return; }
+  const name=(prompt("השם החדש של הפרויקט:",e.name)||"").trim(); if(!name||name===e.name) return;
+  let r; try{ r=await chatApi("/project/rename",{method:"POST",body:JSON.stringify({id:e.id,name})}); }catch(err){ r={error:err.message}; }
+  if(!r||!r.id){ alert(projErr("השם לא שונה.",r&&r.error)); return; }
+  await loadProjects(); renderNav(); toast("השם שונה");
+}
+/* כותרת הדף ובורר הפרויקטים */
+function renderProj(){
+  const el=$("#proj"); if(!el) return;
+  const on=projectsOn(), e=curProject(), title=on?`מרכז המחקר · ${e.name}`:"מרכז המחקר";
+  document.title=title; $("#h1").textContent=title;
+  el.classList.toggle("hidden",!on); if(!on){el.innerHTML="";return;}
+  el.innerHTML=`<button class="proj-btn" id="projbtn" title="החלפת פרויקט">${esc(e.name)} ▾</button>
+    <div class="proj-menu hidden" id="projmenu">
+      ${S.projects.map(p=>`<button data-proj="${esc(p.id)}" class="${p.id===S.project?"on":""}">${p.id===S.project?"✓ ":""}${esc(p.name)}</button>`).join("")}
+      <hr><button id="projren">שינוי שם</button><button id="projnew">פרויקט חדש</button></div>`;
+  const menu=$("#projmenu");
+  $("#projbtn").onclick=ev=>{ev.stopPropagation();menu.classList.toggle("hidden");};
+  menu.onclick=ev=>ev.stopPropagation();
+  el.querySelectorAll("[data-proj]").forEach(b=>b.onclick=()=>{menu.classList.add("hidden");if(b.dataset.proj!==S.project) switchProject(b.dataset.proj);});
+  $("#projren").onclick=()=>{menu.classList.add("hidden");renameProject();};
+  $("#projnew").onclick=()=>{menu.classList.add("hidden");newProject();};
+}
+document.addEventListener("click",()=>{const m=$("#projmenu");if(m)m.classList.add("hidden");});
 const TABS=[["morning","לוח בוקר"],["papers","מאמרים"],["data","נתונים"],["tasks","משימות"],["library","ספרייה"],["claude","קלוד"]];
 
 async function loadAll(){
@@ -248,6 +373,7 @@ async function loadAll(){
   S.links=await readJSON("config/links.json",{});
   S.machines=await readJSON("config/machines.json",{});
   S.demo=await readJSON("config/demo.json",null);
+  S.projInfo=isGeneral()?await readJSON("config/project.json",null):null;
 }
 const stageOf=n=>S.stages.find(s=>s.n===n)||{name:"—",work:"כללי",must:[],nice:[]};
 const paperById=id=>S.papers.find(p=>p.id===id);
@@ -268,7 +394,10 @@ async function boot(){
     $("#app").innerHTML=`<div class="card center"><h2>להתחבר לתיקיית המחקר</h2>
       <p class="muted">התיקייה שנבחרה בפעם הקודמת:</p><p>${ltr(h.name)}</p>
       <div class="row" style="justify-content:center"><button id="reconnect">התחבר</button><button class="sec" id="pick">בחר תיקייה אחרת</button></div></div>`;
-    $("#reconnect").onclick=async()=>{ if(await h.requestPermission({mode:"readwrite"})==="granted"){ROOT=h;start();} };
+    $("#reconnect").onclick=async()=>{ if(await h.requestPermission({mode:"readwrite"})==="granted"){ROOT=h;
+      /* גם תיקיית הפרויקט האחרון, באותה לחיצה (הדפדפן מבקש אישור רק אחרי לחיצה) */
+      const pid=lsGet("rh.project"); if(pid&&pid!=="clinic"){try{const ph=await idbGet("proj:"+pid);if(ph)await ph.requestPermission({mode:"readwrite"});}catch(e){}}
+      start();} };
   } else {
     $("#app").innerHTML=`<div class="card center"><h2>ברוך הבא</h2>
       <p>יש לבחור את תיקיית המערכת בדרייב. עושים את זה פעם אחת בכל מחשב.</p>
@@ -283,7 +412,15 @@ async function boot(){
   };
 }
 async function start(){
-  try{ await loadAll(); }catch(e){ $("#app").innerHTML=`<div class="card"><h2>שגיאה בקריאת התיקייה</h2><pre class="code">${esc(e.message)}</pre></div>`; return; }
+  PROJ=ROOT; await loadProjects();
+  if(!ENG&&S.project!=="clinic"){
+    let ok=false;
+    try{ const ph=await idbGet("proj:"+S.project); ok=!!ph&&await ph.queryPermission({mode:"readwrite"})==="granted"&&await projOk(ph,S.project); if(ok) PROJ=ph; }catch(e){}
+    if(!ok){ S.project="clinic"; setTimeout(()=>toast("נפתח פרויקט המרפאה. לחזרה לפרויקט האחר: לבחור אותו בתפריט הפרויקטים"),300); }
+  }
+  try{ await loadAll(); }catch(e){
+    if(S.project!=="clinic"){ S.project="clinic"; PROJ=ROOT; lsSet("rh.project","clinic"); return start(); }
+    $("#app").innerHTML=`<div class="card"><h2>שגיאה בקריאת התיקייה</h2><pre class="code">${esc(e.message)}</pre></div>`; return; }
   renderNav(); render(); runnerCheck(); setInterval(runnerCheck,30000);
 }
 function renderNav(){
@@ -291,7 +428,8 @@ function renderNav(){
   $("#nav").innerHTML=TABS.map(([k,l])=>`<button data-t="${k}" class="${S.tab===k?"on":""}">${l}</button>`).join("");
   $("#nav").querySelectorAll("button").forEach(b=>b.onclick=()=>{S.tab=b.dataset.t;renderNav();render();});
   const le=latestExport();
-  $("#meta").textContent=le?`ייצוא אחרון: ${le.export_date||le.uploaded_at.slice(0,10)} · לפני ${daysSince(le.uploaded_at)} ימים`:"עוד לא נקלט ייצוא";
+  $("#meta").textContent=le?`${isGeneral()?"קובץ נתונים אחרון":"ייצוא אחרון"}: ${le.export_date||String(le.uploaded_at||"").slice(0,10)} · לפני ${daysSince(le.uploaded_at)} ימים`:(isGeneral()?"עוד לא נקלטו נתונים":"עוד לא נקלט ייצוא");
+  renderProj();
 }
 function render(){
   ({morning:renderMorning,papers:renderPapers,data:renderData,tasks:renderTasks,library:renderLibrary,claude:renderClaude}[S.tab])();
@@ -325,6 +463,35 @@ function morningItems(){
   items.sort((a,b)=>b.pr-a.pr||(b.age||0)-(a.age||0));
   return items;
 }
+/* ---- כרטיס הקמת הפרויקט: בפרויקט כללי, עד שכל ארבעת השלבים הושלמו (config/project.json → setup) ---- */
+const SETUP_STEPS=[["data","נתונים","קובץ הנתונים נשמר בארכיון בלי שינוי ונרשם ביומן"],
+  ["data_key","מבנה הנתונים","מפתח הנתונים: מה כל שורה, המזהים, כיוון כל סולם ואיך מסומן חסר"],
+  ["papers","מאמרים","המאמרים של הפרויקט, וקבצי הנתונים של כל מאמר"],
+  ["sources","מקורות","אוסף זוטרו לכל מאמר, וקישורי קריאה"]];
+const SETUP_STATE={todo:["לא התחיל","gray"],doing:["בתהליך","warn"],done:["הושלם","ok"]};
+function setupOpen(){const s=S.projInfo&&S.projInfo.setup;return isGeneral()&&s&&!s.done_at?s:null;}
+function setupCard(){
+  const s=setupOpen(); if(!s) return "";
+  const cur=SETUP_STEPS.findIndex(([k])=>s[k]!=="done");
+  const btns=k=>k==="data"
+    ?`<button data-setup="file">הוספת קובץ נתונים</button>${s.data==="doing"?` <button class="sec" data-setup="data">להמשיך עם קלוד</button>`:""}`
+    :`<button data-setup="${k}">להמשיך עם קלוד</button>`;
+  return `<div class="card" id="setupcard"><h2>הקמת הפרויקט</h2>
+    <p class="muted">ארבעה שלבים לפי הסדר: קודם הנתונים, אחר כך מפתח הנתונים, ורק אז המאמרים והמקורות.</p>
+    <ol class="setup-steps">${SETUP_STEPS.map(([k,l,d],i)=>{const st=SETUP_STATE[s[k]]||SETUP_STATE.todo;
+      return `<li class="${i===cur?"cur":""}"><div class="row"><b class="grow">${i+1}. ${l}</b><span class="pill ${st[1]}">${st[0]}</span></div>
+        <div class="muted">${d}</div>${i===cur?`<div class="row" style="margin-top:8px">${btns(k)}</div>`:""}</li>`;}).join("")}</ol></div>`;
+}
+function bindSetup(){
+  document.querySelectorAll("[data-setup]").forEach(b=>b.onclick=async()=>{
+    const step=b.dataset.setup;
+    /* שלב 1: לשונית הנתונים ובחירת קובץ, באותה לחיצה (הדפדפן פותח בחירת קובץ רק אחרי לחיצה) */
+    if(step==="file"){ S.tab="data"; renderNav(); render(); const f=$("#file"); if(f) f.click(); return; }
+    const cmd="/project-setup "+step;
+    if(!ENG){ engineNeeded(`<p>השלב הזה נעשה בשיחה עם קלוד. אפשר לכתוב לקלוד קוד:</p>`,cmd); return; }
+    S.chatKey="_main"; S.tab="claude"; renderNav(); render(); await loadChat(); sendChat(cmd);
+  });
+}
 function renderMorning(){
   const items=morningItems(); const types=["הכל",...new Set(items.map(i=>i.type))];
   const f=S.morningFilter||"הכל";
@@ -332,12 +499,12 @@ function renderMorning(){
   const le=latestExport();
   const active=S.papers.filter(p=>p.status==="active");
   const byWork=t=>items.filter(i=>i.type===t).length;
-  $("#app").innerHTML=`
+  $("#app").innerHTML=`${setupCard()}
   <div class="stats">
     <div class="stat"><span class="muted">מאמרים פעילים</span><b>${active.length}</b></div>
     <div class="stat"><span class="muted">כתיבה</span><b>${byWork("כתיבה")}</b></div>
     <div class="stat"><span class="muted">ניתוחים פתוחים</span><b>${byWork("ניתוח")}</b></div>
-    <div class="stat"><span class="muted">משימות למרפאה</span><b>${byWork("מרפאה")}</b></div>
+    ${isGeneral()?"":`<div class="stat"><span class="muted">משימות למרפאה</span><b>${byWork("מרפאה")}</b></div>`}
     <div class="stat"><span class="muted">ימים מאז הייצוא האחרון</span><b>${le?daysSince(le.uploaded_at):"—"}</b></div>
   </div>
   <div class="card">
@@ -356,7 +523,7 @@ function renderMorning(){
     ${shown.length?"":`<p class="muted">אין פריטים.</p>`}
   </div>`;
   $("#mf").onchange=e=>{S.morningFilter=e.target.value;renderMorning();};
-  bindOpen();
+  bindOpen(); bindSetup();
   document.querySelectorAll("[data-done]").forEach(b=>b.onclick=async()=>{
     const i=shown[+b.dataset.done];
     if(i.kind==="task"){const t=S.tasks.find(x=>x.id===i.tid);t.status="done";t.done_at=today();await saveTasks();}
@@ -421,7 +588,8 @@ function dataCell(p){
 /* טיוטה: קובץ וורד בתיקיית המאמר, נפתח ישירות בוורד */
 const isDraft=f=>/\.docx$/i.test(f.name)&&!f.name.startsWith("~$");
 function wordLink(rel){
-  const hub=(S.links.hub_path||"").replace(/\\/g,"/").replace(/\/$/,""); if(!hub) return null;
+  /* הקישור נבנה מהתיקייה המוחלטת של הפרויקט הפעיל; במרפאה: הנתיב מהגדרות הקישורים */
+  const hub=(S.project==="clinic"||!S.project?(S.links.hub_path||""):(curProject().root||"")).replace(/\\/g,"/").replace(/\/$/,""); if(!hub) return null;
   return "ms-word:ofe|u|file:///"+(hub+"/"+rel).split("/").map((x,i)=>i===0?x:encodeURIComponent(x)).join("/");
 }
 function draftCell(p){
@@ -617,7 +785,54 @@ async function freezeForPaper(p,exportId,bg){
 }
 
 /* ============ נתונים ============ */
+/* פרויקט כללי: בלי פענוח ייצוא המרפאה. הקובץ נשמר כמו שהוא בתיבת הקליטה, וקלוד מתעד אותו בארכיון וביומן */
+const SETUP_DATA="/project-setup data";
+async function renderDataGeneral(){
+  $("#app").innerHTML=`<div class="card">
+    <h2>הוספת קובץ נתונים</h2>
+    <div class="drop" id="drop">אפשר לגרור לכאן קובץ נתונים, או <button class="sec" id="pickf">בחירת קובץ</button>
+      <input type="file" id="file" class="hidden">
+      <div class="muted" style="margin-top:8px">הקובץ נשמר בלי שינוי בתיבת הקליטה של הפרויקט. אחר כך קלוד מעביר אותו לארכיון, רושם אותו ביומן ושואל מה ידוע עליו.</div></div>
+    <div id="ingest"></div>
+  </div>
+  <div class="card"><h2>ממתינים בתיבת הקליטה</h2><div id="inbox"><p class="muted">טוען…</p></div></div>
+  <div class="card"><h2>יומן הקליטות</h2>
+    <table><thead><tr><th>נקלט</th><th>קובץ</th><th>שורות</th><th>עמודות</th><th>הערה</th><th>בשימוש במאמרים</th></tr></thead><tbody>
+    ${S.log.slice().reverse().map(e=>`<tr>
+      <td class="muted">${esc(e.uploaded_at||"")}</td>
+      <td>${ltr(e.stored_as||e.original_name||"")}${e.sha256?`<div class="muted">${ltr(String(e.sha256).slice(0,12))}</div>`:""}</td>
+      <td>${e.rows??"—"}</td><td>${e.cols??"—"}</td>
+      <td>${heb(e.note||"")}</td>
+      <td>${[].concat(e.used_by||[]).map(id=>paperChip(paperById(id)||{id,title:id})).join(" ")||"—"}</td></tr>`).join("")}
+    </tbody></table>${S.log.length?"":`<p class="muted">עוד לא נקלטו קבצים.</p>`}</div>`;
+  const drop=$("#drop"), inp=$("#file");
+  $("#pickf").onclick=()=>inp.click();
+  inp.onchange=()=>inp.files[0]&&addDataFile(inp.files[0]);
+  drop.ondragover=e=>{e.preventDefault();drop.classList.add("over");};
+  drop.ondragleave=()=>drop.classList.remove("over");
+  drop.ondrop=e=>{e.preventDefault();drop.classList.remove("over");if(e.dataTransfer.files[0]) addDataFile(e.dataTransfer.files[0]);};
+  bindOpen();
+  const waiting=await listFiles("exports/inbox"), box=$("#inbox"); if(!box) return;
+  box.innerHTML=waiting.length?waiting.map(f=>`<div>${ltr(f.name)}</div>`).join("")+`<p class="muted">קלוד מעביר אותם לארכיון בשלב הנתונים של הקמת הפרויקט.</p>`:`<p class="muted">אין קבצים ממתינים.</p>`;
+}
+async function addDataFile(file){
+  const buf=await file.arrayBuffer(), h=await sha256(buf);
+  const dup=S.log.find(e=>e.sha256===h);
+  if(dup){alert(`הקובץ הזה כבר נקלט ב-${dup.uploaded_at||"?"} (אותה טביעת אצבע). לא נשמר שוב.`);return;}
+  let name=file.name.replace(/[\/\\]/g,"_");
+  if(await exists("exports/inbox/"+name)){const dot=name.lastIndexOf(".");name=dot>0?name.slice(0,dot)+"__"+Date.now()+name.slice(dot):name+"__"+Date.now();}
+  try{ await writeBlob("exports/inbox/"+name,new Blob([buf])); }catch(e){ alert("הקובץ לא נשמר.\n"+e.message); return; }
+  toast("הקובץ נשמר בתיבת הקליטה");
+  if(!ENG){
+    $("#ingest").innerHTML=`<div class="card" style="margin-top:12px"><p>הקובץ נשמר. כדי לתעד אותו ביומן, אפשר לבקש מקלוד קוד:</p>
+      <div class="cmd"><pre class="code">${esc(SETUP_DATA)}</pre><button class="sec" id="cc">העתק</button></div></div>`;
+    $("#cc").onclick=()=>copy(SETUP_DATA); return;
+  }
+  S.chatKey="_main"; S.tab="claude"; renderNav(); render();
+  await loadChat(); sendChat(SETUP_DATA);
+}
 function renderData(){
+  if(isGeneral()) return renderDataGeneral();
   $("#app").innerHTML=`<div class="card">
     <h2>קליטת ייצוא חדש</h2>
     <div class="drop" id="drop">אפשר לגרור לכאן את קובץ הייצוא שהורד היום, או <button class="sec" id="pickf">בחר קובץ</button>
@@ -725,7 +940,11 @@ function renderLibrary(){
   const c=S.catalog; const minS=S.minScore||1;
   const cat=c?c.catalog.filter(x=>x.score>=minS).sort((a,b)=>b.score-a.score):[];
   const le=latestExport();
-  $("#app").innerHTML=`
+  const gen=isGeneral();
+  /* פרויקט כללי: מפתח הנתונים של הפרויקט וקישורי הקריאה שלו. בלי שאלוני המרפאה ובלי קטלוג לוץ */
+  const genKey=`<div class="card"><h2>מפתח הנתונים של הפרויקט</h2>
+    <div id="dkey"><p class="muted">טוען…</p></div></div>`;
+  $("#app").innerHTML=(gen?genKey:`
   <div class="card"><h2>מפתח הנתונים ומקרא הציונים</h2>
     <div class="row"><button class="sec" data-md2="library/data-key.md">מפתח פענוח הייצוא</button>
       ${S.links.scoring_sheet?`<a class="btn" href="${esc(S.links.scoring_sheet)}" target="_blank">מקרא ציוני השאלונים (הגיליון החי)</a>`:""}
@@ -752,7 +971,7 @@ function renderLibrary(){
     </tbody></table>
     ${c?`<p class="muted">דף הפרסומים של המעבדה:</p>${c.lab_pages.map(u=>`<p><a href="${esc(u)}" target="_blank">${ltr("uni-trier.de — publications")}</a></p>`).join("")}`:""}
     <p class="muted">"הסף הושג" נבדק מול מספר המטופלים בייצוא האחרון בלבד, בלי לבדוק מספר מפגשים. הבדיקה המלאה נעשית אצל קלוד.</p>
-  </div>
+  </div>`)+`
 
   <div class="card"><h2>פרופילי כתבי עת</h2>
     <table><thead><tr><th>כתב עת</th><th>אורך</th><th>תקציר</th><th>מקורות</th><th>רשימות בדיקה</th><th>אומת</th></tr></thead><tbody>
@@ -765,7 +984,11 @@ function renderLibrary(){
     <div class="row" style="margin-top:10px"><input id="rt" class="grow" placeholder="שם"><input id="ru" class="grow" style="direction:ltr" placeholder="https://"><input id="rtop" placeholder="נושא"><button class="sec" id="radd">הוסף</button></div>
     <p class="muted">מקורות לציטוט במאמר נכנסים רק דרך זוטרו. הרשימה כאן היא לעיון.</p>
   </div>`;
-  $("#ms").onchange=e=>{S.minScore=+e.target.value;renderLibrary();};
+  if(gen) exists("library/data-key.md").then(ok=>{const b=$("#dkey");if(!b)return;
+    b.innerHTML=ok?`<button class="sec" id="dkb">מפתח הנתונים</button><p class="muted">מה כל קובץ מכיל, מה שורה אחת, המשתנים, כללי הניקוד והחסרים.</p>`
+      :`<p class="muted">עוד אין מפתח נתונים. הוא נכתב עם קלוד בשלב השני של הקמת הפרויקט, אחרי הוספת קובץ נתונים.</p>`;
+    const k=$("#dkb"); if(k) k.onclick=()=>showMd("library/data-key.md");});
+  const ms=$("#ms"); if(ms) ms.onchange=e=>{S.minScore=+e.target.value;renderLibrary();};
   document.querySelectorAll("[data-md]").forEach(b=>b.onclick=()=>showMd("library/instruments/"+b.dataset.md));
   document.querySelectorAll("[data-md2]").forEach(b=>b.onclick=()=>showMd(b.dataset.md2));
   $("#radd").onclick=async()=>{const t=$("#rt").value.trim(),u=$("#ru").value.trim();if(!t||!u)return;S.refs.push({title:t,url:u,topic:$("#rtop").value.trim()});await writeJSON("library/refs/links.json",{items:S.refs});toast("נוסף");renderLibrary();};
@@ -809,13 +1032,14 @@ const COMMANDS=[
   ["/verify","בדיקת שלמות: כל קובץ בארכיון תואם ליומן, וכל תמונה קפואה תואמת למקור"]
 ];
 /* שיחה עם קלוד: חלון שיחה לכל מאמר, קלוד רץ במחשב שבו המנוע פועל (גם מרחוק דרך המנהרה) */
-const SHORTCUTS=[
+const SHORTCUTS_ALL=[
   ["מה לעשות היום","מה לעשות היום? פעל לפי claude-commands/morning.md ותן סיכום קצר."],
   ["סיכום היומן","סכם במשפטים ספורים את יומן העבודה: איפה עצרנו ומה הצעד הבא."],
   ["סריקת נתונים","הרץ Rscript R/scan_data.R על המאמר הזה, קרא את outputs/scan/scan.md, ותגיד בקצרה מה בולט בנתונים ואילו ניתוחים כדאי לנסות, מדורגים."],
   ["בדיקת שער","בדוק את השער של השלב הנוכחי לפי claude-commands/gate.md."],
   ["הרצת ניתוח","הרץ את ניתוחי המאמר לפי claude-commands/analyze.md והסבר את התוצאות בעברית פשוטה."],
   ["טיוטת פרק","עזור לי לנסח פרק לפי claude-commands/draft.md. קודם שאל אותי איזה פרק."]];
+const shortcuts=()=>SHORTCUTS_ALL.filter(s=>!(isGeneral()&&s[0]==="סריקת נתונים"));
 S.chatKey=S.chatKey||"_main";
 function askCard(){
   if(!ENG) return `<div class="card"><h2>שיחה עם קלוד</h2><p class="muted">זמין רק כשהלוח פתוח דרך המנוע: במחשב בבית, או מרחוק דרך הכתובת של השרת.</p></div>`;
@@ -827,7 +1051,7 @@ function askCard(){
       <button class="ghost" id="chatnew" title="קלוד מתחיל מחדש, בלי ההקשר של השיחה הזו. היומן נשאר.">שיחה חדשה</button></div>
     <div class="chat-log" id="chatlog"><p class="muted">טוען…</p></div>
     <div class="chat-f">
-      <div class="chips">${SHORTCUTS.map(([l],i)=>`<button data-sc="${i}">${esc(l)}</button>`).join("")}</div>
+      <div class="chips">${shortcuts().map(([l],i)=>`<button data-sc="${i}">${esc(l)}</button>`).join("")}</div>
       <div class="row" style="align-items:flex-end"><textarea id="chatin" class="grow" placeholder="מה לעשות?"></textarea><button class="send" id="chatsend">שלח</button></div>
     </div></div>`;
 }
@@ -847,7 +1071,7 @@ async function chatApi(path,opt={}){
 async function loadChat(){
   const box=$("#chatlog"); if(!box) return;
   try{
-    const r=await chatApi("/chat?key="+encodeURIComponent(S.chatKey));
+    const r=await chatApi("/chat?key="+encodeURIComponent(S.chatKey)+"&"+projQ());
     const ms=r.messages||[];
     box.innerHTML=ms.length?ms.map(bubble).join(""):`<p class="muted">עוד אין שיחה כאן. אפשר לכתוב בקשה, או לבחור אחד הקיצורים.</p>`;
     bindChatButtons(); box.scrollTop=box.scrollHeight;
@@ -865,7 +1089,7 @@ async function sendChat(text){
   box.insertAdjacentHTML("beforeend",bubble({role:"user",text})+`<div class="chat-prog" id="chatprog">שולח…</div>`);
   box.scrollTop=box.scrollHeight; btn.disabled=true; $("#chatin").value="";
   try{
-    const r=await chatApi("/claude",{method:"POST",body:JSON.stringify({prompt:text,paper:S.chatKey==="_main"?"":S.chatKey})});
+    const r=await chatApi("/claude",{method:"POST",body:JSON.stringify({prompt:text,paper:S.chatKey==="_main"?"":S.chatKey,project:S.project})});
     if(!r.job) throw new Error(r.error||"המנוע סירב");
     const t0=Date.now();
     const poll=async()=>{
@@ -883,9 +1107,9 @@ function bindChat(){
   $("#chatsel").onchange=e=>{S.chatKey=e.target.value;loadChat();};
   $("#chatsend").onclick=()=>sendChat($("#chatin").value);
   $("#chatin").onkeydown=e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();sendChat($("#chatin").value);}};
-  document.querySelectorAll("[data-sc]").forEach(b=>b.onclick=()=>sendChat(SHORTCUTS[+b.dataset.sc][1]));
+  document.querySelectorAll("[data-sc]").forEach(b=>b.onclick=()=>sendChat(shortcuts()[+b.dataset.sc][1]));
   $("#chatnew").onclick=async()=>{ if(!confirm("להתחיל שיחה חדשה? קלוד לא יזכור את השיחה הזו, אבל היומן של המאמר נשאר.")) return;
-    await chatApi("/chat/reset?key="+encodeURIComponent(S.chatKey),{method:"POST",body:"{}"}); loadChat(); };
+    await chatApi("/chat/reset?key="+encodeURIComponent(S.chatKey)+"&"+projQ(),{method:"POST",body:JSON.stringify({project:S.project})}); loadChat(); };
   loadChat();
 }
 function openChatFor(id){ S.chatKey=id; S.tab="claude"; document.querySelector(".modal-bg")?.remove(); renderNav(); render(); }
@@ -950,7 +1174,7 @@ async function runJob(script,paper,box,onDone){
   if(!(await runnerCheck())){box.innerHTML=ENGINE_OFF;return;}
   box.innerHTML=`<p class="muted">מריץ…</p><pre class="log"></pre>`;
   let r;
-  try{r=await fetch(RUN.url+"/run",{method:"POST",headers:{"Content-Type":"application/json","X-Token":RUN.token||""},body:JSON.stringify({script,paper})});}
+  try{r=await fetch(RUN.url+"/run",{method:"POST",headers:{"Content-Type":"application/json","X-Token":RUN.token||""},body:JSON.stringify({script,paper,project:S.project})});}
   catch(e){box.innerHTML=`<p class="pill bad">אין חיבור למנוע</p>`;return;}
   const j=await r.json(); if(!j.job){box.innerHTML=`<p><span class="pill bad">המנוע סירב להריץ</span></p><pre class="log">${esc(j.error||"")}</pre>`;return;}
   const poll=async()=>{
