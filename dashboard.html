@@ -37,6 +37,8 @@
   button,.btn{text-decoration:none;display:inline-block;font:inherit;background:var(--accent);color:#fff;border:0;border-radius:8px;padding:7px 14px;cursor:pointer}
   button.sec{background:#fff;color:var(--accent);border:1px solid var(--accent)}
   button.ghost{background:transparent;color:var(--muted);padding:4px 8px;white-space:nowrap}
+  button.done-btn{background:#fff;color:var(--accent);border:1px solid var(--line);border-radius:8px;padding:4px 10px;font-size:13px;white-space:nowrap;cursor:pointer}
+  button.done-btn:hover{border-color:var(--accent);background:#f3f7fb}
   button:disabled{opacity:.4;cursor:not-allowed}
   input,select,textarea{font:inherit;padding:7px 9px;border:1px solid #cfccc5;border-radius:8px;background:#fff}
   textarea{width:100%;min-height:70px}
@@ -538,7 +540,7 @@ function renderMorning(){
       <td>${i.paper?paperChip(i.paper):"—"}</td>
       <td>${i.paper?miniStages(i.paper.stage):""}</td>
       <td>${i.age??""}</td>
-      <td><button class="ghost" data-done="${ix}" title="סמן כבוצע">✓ בוצע</button></td></tr>`).join("")}
+      <td><button class="done-btn" data-done="${ix}" title="המשימה עדיין פתוחה. לחיצה מסמנת אותה כבוצעה ומורידה אותה מהרשימה">לסמן כבוצע</button></td></tr>`).join("")}
     </tbody></table>
     ${shown.length?"":`<p class="muted">אין פריטים.</p>`}
   </div>`;
@@ -944,7 +946,7 @@ function renderTasks(){
       <td>${t.status==="done"?`<s>${heb(t.title)}</s>`:`<b>${heb(t.title)}</b>`}${t.note?`<div class="muted">${heb(t.note)}</div>`:""}</td>
       <td>${t.paper?paperChip(paperById(t.paper)||{id:t.paper,title:t.paper}):"—"}</td>
       <td class="muted">${esc(t.created_at)}</td>
-      <td>${t.status==="open"?`<button class="ghost" data-td="${t.id}">✓ בוצע</button>`:`<button class="ghost" data-tr="${t.id}">פתח מחדש</button>`}</td></tr>`).join("")}
+      <td>${t.status==="open"?`<button class="done-btn" data-td="${t.id}">לסמן כבוצע</button>`:`<button class="ghost" data-tr="${t.id}">פתח מחדש</button>`}</td></tr>`).join("")}
     </tbody></table></div>`;
   $("#sd").onchange=e=>{S.showDone=e.target.checked;renderTasks();};
   $("#tadd").onclick=async()=>{const title=$("#tt").value.trim();if(!title)return;
