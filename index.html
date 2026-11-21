@@ -43,12 +43,16 @@
   button.done-btn:active,.nav-arrow:active{transform:scale(0.97)}
   .done-btn.is-done{display:inline-block;background:var(--ok);color:#fff;border:1px solid var(--ok);border-radius:8px;padding:4px 10px;font-size:13px;font-weight:600;white-space:nowrap}
   button.done-btn.is-done:hover{background:var(--ok);filter:brightness(1.08);border-color:var(--ok)}
-  tr.row-done td{background:var(--ok-soft)} tr.row-done b{color:var(--muted);font-weight:500}
+  .th-sort{background:none;border:0;padding:0;font:inherit;color:inherit;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+  .th-sort .th-ar{font-size:10px;opacity:.45}
+  .th-sort.on{color:var(--accent)} .th-sort.on .th-ar{opacity:1}
+  .th-filters td{background:#faf9f7;padding:4px 6px 8px;border-bottom:1px solid var(--line)}
+  .th-f{width:100%;min-width:64px;font:inherit;font-size:13px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+  .th-f:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
   .row-nav{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
   .row-pos{font-size:11px;color:var(--muted);text-align:center;margin-top:3px}
   .arr{background:#fff;color:var(--accent);border:1px solid var(--line);border-radius:8px;width:28px;height:28px;padding:0;font-size:17px;line-height:1;display:inline-flex;align-items:center;justify-content:center;transition:background-color 150ms ease,border-color 150ms ease,transform 150ms cubic-bezier(0.23,1,0.32,1)}
   .arr:disabled{opacity:.3;cursor:default}
-  .arr.go{background:var(--accent);color:#fff;border-color:var(--accent)}
   .arr:not(:disabled):active{transform:scale(0.94)}
   @media (hover:hover) and (pointer:fine){ .arr:not(:disabled):not(.go):hover{border-color:var(--accent);background:#f3f7fb} }
   .nav-arrow{background:#fff;color:var(--accent);border:1px solid var(--line);border-radius:8px;padding:7px 14px;font-size:14px;transition:background-color 150ms ease,border-color 150ms ease,transform 150ms cubic-bezier(0.23,1,0.32,1)}
@@ -602,11 +606,31 @@ function doneBtn(i,attr){
   return i.kind==="next"?`<span class="done-btn is-done" title="הצעד נרשם בהיסטוריה של המאמר">✓ בוצע</span>`
     :`<button class="done-btn is-done" ${attr} title="בוצע. לחיצה פותחת את המשימה מחדש">✓ בוצע</button>`;
 }
+/* מסננים ומיון לכל עמודה בלוח הבוקר (חוץ משלב) */
+const MCOLS=[["pr","עדיפות"],["type","סוג"],["text","פעולה"],["paper","מאמר"],["stage",""],["age","ימים"]];
+const paperName=p=>p?(p.short||p.title):"";
+function mVal(i,c){
+  if(c==="pr") return Math.round(i.pr);
+  if(c==="type") return i.type||"";
+  if(c==="text") return i.text||"";
+  if(c==="paper") return paperName(i.paper)||"ללא מאמר";
+  if(c==="age") return i.done?-1:(i.age??-1);
+  return "";
+}
+function mPass(i,F){
+  if(F.pr&&String(Math.round(i.pr))!==F.pr) return false;
+  if(F.type&&i.type!==F.type) return false;
+  if(F.paper&&mVal(i,"paper")!==F.paper) return false;
+  if(F.text&&!String(i.text+" "+(i.extra||[]).join(" ")).toLowerCase().includes(F.text.toLowerCase())) return false;
+  if(F.age&&!i.done&&!((i.age??0)>+F.age)) return false;
+  return true;
+}
 function renderMorning(){
-  const items=morningItems(); const types=["הכל",...new Set(items.map(i=>i.type))];
-  const f=S.morningFilter||"הכל"; const byF=i=>f==="הכל"||i.type===f;
-  const shown=items.filter(byF);
-  const done=doneItems().filter(byF);
+  const items=morningItems();
+  const F=S.mf=S.mf||{pr:"",type:"",text:"",paper:"",age:""};
+  const SO=S.msort=S.msort||{col:"pr",dir:-1};
+  const shown=items.filter(i=>mPass(i,F));
+  const done=doneItems().filter(i=>mPass(i,{...F,age:""}));
   /* שורה לכל מאמר (ומשימות בלי מאמר לפי סוג). החצים בשורה עוברים בין המשימות שלו:
      ימינה (›) אחורה למה שכבר בוצע, שמאלה (‹) קדימה למשימות הפתוחות האחרות */
   const gk=i=>i.paper?"p:"+i.paper.id:"t:"+i.type;
@@ -619,6 +643,20 @@ function renderMorning(){
     let x=seq.findIndex(i=>itemKey(i)===S.rowPos[k]); if(x<0) x=g.done.length;
     return {k,seq,x,cur:seq[x],nOpen:g.open.length,nDone:g.done.length,top:g.open[0]};
   });
+  /* מיון לפי המשימה הפתוחה הראשונה של כל שורה, כדי שהשורות לא יקפצו כשמדפדפים */
+  const cmp=(a,b)=>{const va=mVal(a.top,SO.col),vb=mVal(b.top,SO.col);
+    const r=typeof va==="number"&&typeof vb==="number"?va-vb:String(va).localeCompare(String(vb),"he");
+    return r*SO.dir||(b.top.pr-a.top.pr)||((b.top.age||0)-(a.top.age||0));};
+  rows.sort(cmp);
+  /* אחרי לחיצה בשורה (חץ או בוצע) שומרים על סדר השורות, כדי שהשורה לא תקפוץ */
+  if(S.mKeep&&S.mOrder){const o=new Map(S.mOrder.map((k,ix)=>[k,ix]));rows.sort((a,b)=>(o.has(a.k)?o.get(a.k):1e9)-(o.has(b.k)?o.get(b.k):1e9));}
+  S.mKeep=false; S.mOrder=rows.map(r=>r.k);
+  const uniq=(c)=>[...new Set(items.map(i=>String(mVal(i,c))))].sort((a,b)=>c==="pr"?b-a:a.localeCompare(b,"he"));
+  const sel=(c,opts)=>`<select class="th-f" data-f="${c}" aria-label="סינון">${[["","הכל"],...opts].map(([v,l])=>`<option value="${esc(v)}" ${F[c]===v?"selected":""}>${esc(l)}</option>`).join("")}</select>`;
+  const filt={pr:sel("pr",uniq("pr").map(v=>[v,v])),type:sel("type",uniq("type").map(v=>[v,v])),
+    text:`<input class="th-f" data-f="text" type="search" placeholder="חיפוש" value="${esc(F.text)}" aria-label="חיפוש בפעולה">`,
+    paper:sel("paper",uniq("paper").map(v=>[v,v])),stage:"",age:sel("age",[["7","מעל 7"],["30","מעל 30"]])};
+  const anyF=Object.values(F).some(Boolean);
   const le=latestExport();
   const active=S.papers.filter(p=>p.status==="active");
   const byWork=t=>items.filter(i=>i.type===t).length;
@@ -631,11 +669,12 @@ function renderMorning(){
     <div class="stat"><span class="muted">ימים מאז הייצוא האחרון</span><b>${le?daysSince(le.uploaded_at):"—"}</b></div>
   </div>
   <div class="card">
-    <div class="row"><h2 class="grow">מה עושים היום</h2>
-      <select id="mf">${types.map(t=>`<option ${t===f?"selected":""}>${t}</option>`).join("")}</select></div>
-    <table><thead><tr><th>עדיפות</th><th>סוג</th><th>פעולה</th><th>מאמר</th><th>שלב</th><th>ימים</th><th></th></tr></thead><tbody>
+    <div class="row"><h2 class="grow">מה עושים היום</h2>${anyF?`<button class="ghost" id="mfclear">לנקות סינון</button>`:""}</div>
+    <table class="mtable"><thead><tr>${MCOLS.map(([c,l])=>c==="stage"?`<th>שלב</th>`:
+      `<th><button class="th-sort ${SO.col===c?"on":""}" data-sort="${c}" title="מיון">${l}<span class="th-ar">${SO.col===c?(SO.dir<0?"▼":"▲"):"↕"}</span></button></th>`).join("")}<th></th></tr>
+      <tr class="th-filters">${MCOLS.map(([c])=>`<td>${filt[c]}</td>`).join("")}<td></td></tr></thead><tbody>
     ${rows.map((r,rx)=>{const i=r.cur; const pos=i.done?`בוצעה ${r.x+1}/${r.nDone}`:`${r.x-r.nDone+1}/${r.nOpen}`;
-      return `<tr class="${i.done?"row-done":""}">
+      return `<tr>
       <td>${prBadge(i.pr)}</td>
       <td>${itemType(i)}</td>
       <td><b>${heb(i.text)}</b>${i.done&&i.at?` <span class="muted">· ${esc(dmy(i.at))}</span>`:""}${i.extra.length?`<div class="muted">חסר: ${i.extra.map(heb).join(" · ")}</div>`:""}${i.flag?`<div><span class="pill warn">${heb(i.flag)}</span></div>`:""}</td>
@@ -645,17 +684,22 @@ function renderMorning(){
       <td><div class="row-nav">
         <button class="arr" data-mv="${rx}:-1" ${r.x<=0?"disabled":""} title="אחורה: משימות שכבר בוצעו" aria-label="המשימה הקודמת">›</button>
         ${doneBtn(i,`data-row="${rx}"`)}
-        <button class="arr ${i.done&&r.x<r.seq.length-1?"go":""}" data-mv="${rx}:1" ${r.x>=r.seq.length-1?"disabled":""} title="קדימה: משימות פתוחות נוספות" aria-label="המשימה הבאה">‹</button>
+        <button class="arr" data-mv="${rx}:1" ${r.x>=r.seq.length-1?"disabled":""} title="קדימה: המשימה הפתוחה הבאה" aria-label="המשימה הבאה">‹</button>
       </div>${r.seq.length>1?`<div class="row-pos">${pos}</div>`:""}</td></tr>`;}).join("")}
     </tbody></table>
-    ${rows.length?"":`<p class="muted">אין משימות פתוחות.</p>`}
+    ${rows.length?"":`<p class="muted">${anyF?"אין משימות שמתאימות לסינון.":"אין משימות פתוחות."}</p>`}
   </div>`;
-  $("#mf").onchange=e=>{S.morningFilter=e.target.value;renderMorning();};
   bindOpen(); bindSetup();
-  document.querySelectorAll("[data-mv]").forEach(b=>b.onclick=()=>{const [rx,d]=b.dataset.mv.split(":").map(Number);const r=rows[rx];const n=r.seq[r.x+d];if(n){S.rowPos[r.k]=itemKey(n);renderMorning();}});
+  document.querySelectorAll("[data-sort]").forEach(b=>b.onclick=()=>{const c=b.dataset.sort;
+    S.msort=SO.col===c?{col:c,dir:-SO.dir}:{col:c,dir:(c==="pr"||c==="age")?-1:1}; renderMorning();});
+  document.querySelectorAll("select.th-f").forEach(s=>s.onchange=()=>{F[s.dataset.f]=s.value;renderMorning();});
+  const tx=document.querySelector('input.th-f[data-f="text"]');
+  if(tx){ tx.oninput=()=>{F.text=tx.value;clearTimeout(S.mfT);S.mfT=setTimeout(()=>{renderMorning();const n=document.querySelector('input.th-f[data-f="text"]');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length);}},250);}; }
+  const cl=$("#mfclear"); if(cl) cl.onclick=()=>{S.mf={pr:"",type:"",text:"",paper:"",age:""};renderMorning();};
+  document.querySelectorAll("[data-mv]").forEach(b=>b.onclick=()=>{const [rx,d]=b.dataset.mv.split(":").map(Number);const r=rows[rx];const n=r.seq[r.x+d];if(n){S.rowPos[r.k]=itemKey(n);S.mKeep=true;renderMorning();}});
   document.querySelectorAll("[data-row]").forEach(b=>b.onclick=async()=>{const r=rows[+b.dataset.row];const i=r.cur;
     const k=i.done?await reopen(i):await markDone(i); if(k===null&&!i.done) return;
-    if(k) S.rowPos[r.k]=k; toast(i.done?"נפתח מחדש":"סומן כבוצע"); renderMorning();});
+    if(k) S.rowPos[r.k]=k; S.mKeep=true; toast(i.done?"נפתח מחדש":"סומן כבוצע"); renderMorning();});
 }
 const short=t=>t.length>48?t.slice(0,46)+"…":t;
 /* כפתור מאמר: שם קצר, הכותרת המלאה בריחוף */
