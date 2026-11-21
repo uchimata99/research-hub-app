@@ -51,6 +51,11 @@
   .mtable th:last-child,.mtable td:last-child{text-align:center}
   .th-filters td{background:#faf9f7;padding:4px 6px 8px;border-bottom:1px solid var(--line)}
   .th-f{width:100%;min-width:64px;font:inherit;font-size:13px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+  .th-f.pr-bad{background:var(--bad-soft);color:var(--bad);border-color:var(--bad);font-weight:600}
+  .th-f.pr-warn{background:var(--warn-soft);color:var(--warn);border-color:var(--warn);font-weight:600}
+  .th-f.ty-acc{background:var(--accent-soft);color:var(--accent);border-color:var(--accent);font-weight:600}
+  .th-f.ty-ok{background:var(--ok-soft);color:var(--ok);border-color:var(--ok);font-weight:600}
+  .th-f.pr-gray{background:#eee;color:#555;font-weight:600}
   .th-f:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
   .add-task{background:#faf9f7;border:1px solid var(--line);border-radius:10px;padding:12px;margin:4px 0 14px}
   .row-nav{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
@@ -71,6 +76,22 @@
   .muted{color:var(--muted);font-size:13px}
   .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
   .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .stat-btn{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:right;color:var(--ink);font:inherit;cursor:pointer;transition:border-color 150ms ease,box-shadow 150ms ease,transform 150ms cubic-bezier(0.23,1,0.32,1)}
+  .stat-btn b{font-size:22px}
+  .stat-btn:active{transform:scale(0.98)}
+  .stat-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .stat-pop{position:absolute;top:calc(100% + 6px);inset-inline-start:0;z-index:12;min-width:260px;max-width:360px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px #0002;padding:8px 10px;display:flex;flex-direction:column;gap:4px;opacity:0;visibility:hidden;transform:translateY(-4px);transition:opacity 150ms ease,transform 150ms cubic-bezier(0.23,1,0.32,1),visibility 0s 150ms;pointer-events:none}
+  .sp-row{font-size:13px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sp-more{font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:4px;margin-top:2px}
+  @media (hover:hover) and (pointer:fine){
+    .stat-btn:hover{border-color:var(--accent);box-shadow:0 2px 10px #2f5d8a1a}
+    .stat-btn:hover .stat-pop{opacity:1;visibility:visible;transform:none;transition-delay:250ms,250ms,0s}
+  }
+  .stat-list{list-style:none;margin:8px 0 0;padding:0}
+  .stat-list li{padding:8px 0;border-bottom:1px solid var(--line)}
+  .linkish{background:none;border:0;padding:0;color:var(--accent);font:inherit;font-weight:600;cursor:pointer;text-align:right}
+  .linkish:hover{text-decoration:underline}
+  @media (prefers-reduced-motion:reduce){ .stat-btn,.stat-pop{transition:none} .stat-btn:active{transform:none} }
   .stat b{display:block;font-size:24px}
   .stages{display:grid;grid-template-columns:repeat(9,1fr);gap:4px;margin:10px 0 4px}
   .stg{font-size:12px;text-align:center;padding:8px 2px;border-radius:6px;background:#eee;color:#666;line-height:1.25}
@@ -180,6 +201,17 @@
     table.stack td[data-label=""]::before{display:none}
     table.stack td.empty{display:none}
   }
+  /* ===== חלון כפול ===== */
+  .embed header,.embed #demobar{display:none}
+  .embed main{padding:14px}
+  .split-btn{display:inline-flex;align-items:center;gap:6px;background:transparent;color:#c3cfdd;border:1px solid #ffffff26;border-radius:8px;padding:5px 10px;font-size:13px;transition:background-color 150ms ease,color 150ms ease}
+  .split-btn[aria-pressed="true"]{background:#ffffff1c;color:#fff;border-color:#ffffff40}
+  @media (hover:hover) and (pointer:fine){ .split-btn:hover{background:#ffffff12;color:#fff} }
+  body.split main{max-width:none;margin:0 0 0 50%;padding:16px}
+  #split{position:fixed;left:0;top:var(--hdr-bot,var(--hdr-h,56px));bottom:0;width:50%;display:flex;flex-direction:column;border-right:2px solid var(--line);background:var(--bg);z-index:5}
+  .split-bar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--card)}
+  .split-bar select{font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:6px}
+  #split iframe{flex:1;width:100%;border:0;background:var(--bg)}
   /* ===== כותרת קבועה ===== */
   :root{--ease-out:cubic-bezier(0.23,1,0.32,1);--hdr-bg:#1b2a3f}
   header{position:sticky;top:0;z-index:15;background:var(--hdr-bg);padding:10px 20px;gap:14px;border-bottom:1px solid #ffffff14;transition:box-shadow 200ms ease}
@@ -230,8 +262,8 @@
 /* כותרת קבועה: גובה הכותרת לכותרות הטבלאות, וצל כשגוללים */
 (function(){const h=document.querySelector("header");if(!h)return;
   const set=()=>document.documentElement.style.setProperty("--hdr-h",h.offsetHeight+"px");
-  set(); if(window.ResizeObserver) new ResizeObserver(set).observe(h); else addEventListener("resize",set);
-  const sc=()=>h.classList.toggle("scrolled",scrollY>4); addEventListener("scroll",sc,{passive:true}); sc();})();
+  set(); if(window.ResizeObserver) new ResizeObserver(()=>{set();sc();}).observe(h); else addEventListener("resize",set);
+  const sc=()=>{h.classList.toggle("scrolled",scrollY>4);document.documentElement.style.setProperty("--hdr-bot",Math.max(0,h.getBoundingClientRect().bottom)+"px");}; addEventListener("scroll",sc,{passive:true}); sc();})();
 /* ============ אחסון: גישה לתיקייה ============ */
 const DB_NAME="research-hub", STORE="h";
 function idb(){return new Promise((res,rej)=>{const r=indexedDB.open(DB_NAME,1);r.onupgradeneeded=()=>r.result.createObjectStore(STORE);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
@@ -326,6 +358,9 @@ function exportDateFromName(name){
 }
 
 /* ============ מצב ============ */
+/* מסך מפוצל: החצי השני הוא עותק של הלוח (embed=1) עם לשונית משלו */
+const QP=new URLSearchParams(location.search); const EMBED=QP.get("embed")==="1";
+if(EMBED) document.documentElement.classList.add("embed");
 const S={stages:[],statuses:{},journals:[],papers:[],tasks:[],log:[],catalog:null,instruments:[],refs:[],tab:"morning",project:"clinic",projects:[]};
 
 /* ============ פרויקטים ============ */
@@ -346,7 +381,7 @@ async function loadProjects(){
   list=list.filter(p=>p&&typeof p.id==="string");
   if(!list.some(p=>p.id==="clinic")) list.unshift(CLINIC);
   S.projects=list;
-  const id=lsGet("rh.project");
+  const id=EMBED&&QP.get("project")?QP.get("project"):lsGet("rh.project");
   S.project=list.some(p=>p.id===id)?id:"clinic";
 }
 /* הבורר מוצג רק כשיש יותר מפרויקט אחד, או כשהמנוע תומך בפרויקטים (גם בעותק ההדרכה: שם פרויקטי התרגול נשמרים בתוך עותק ההדרכה) */
@@ -504,15 +539,44 @@ async function start(){
   try{ await loadAll(); }catch(e){
     if(S.project!=="clinic"){ S.project="clinic"; PROJ=ROOT; lsSet("rh.project","clinic"); return start(); }
     $("#app").innerHTML=`<div class="card"><h2>שגיאה בקריאת התיקייה</h2><pre class="code">${esc(e.message)}</pre></div>`; return; }
+  if(EMBED&&QP.get("tab")&&TABS.some(([k])=>k===QP.get("tab"))) S.tab=QP.get("tab");
   renderNav(); render(); runnerCheck(); setInterval(runnerCheck,30000);
+  if(!EMBED&&lsGet("rh.split")) openSplit(lsGet("rh.split"));
 }
+/* חלון כפול: רק כשהלוח רץ מהמנוע (הלפטופ דרך השרת, או המחשב בבית), ובמסך רחב */
+function splitOk(){return ENG&&!EMBED&&innerWidth>=1100;}
+function openSplit(tab){
+  if(!splitOk()) return;
+  tab=TABS.some(([k])=>k===tab)?tab:(S.tab==="morning"?"papers":"morning");
+  lsSet("rh.split",tab);
+  let a=document.getElementById("split");
+  if(!a){a=document.createElement("aside");a.id="split";document.body.appendChild(a);}
+  a.innerHTML=`<div class="split-bar"><select id="splittab" aria-label="הלשונית בחלון השני">${TABS.map(([k,l])=>`<option value="${k}" ${k===tab?"selected":""}>${l}</option>`).join("")}</select>
+    <button class="ghost" id="splitreload" title="לרענן את החלון השני">רענון</button><span class="grow"></span><button class="ghost" id="splitx">סגירת החלון השני ✕</button></div>
+    <iframe id="splitframe" title="חלון שני" src="${location.pathname}?embed=1&tab=${encodeURIComponent(tab)}&project=${encodeURIComponent(S.project)}"></iframe>`;
+  document.body.classList.add("split"); dispatchEvent(new Event("scroll"));
+  $("#splittab").onchange=e=>openSplit(e.target.value);
+  $("#splitreload").onclick=()=>{const fr=$("#splitframe");fr.src=fr.src;};
+  $("#splitx").onclick=closeSplit;
+  renderSplitBtn();
+}
+function closeSplit(){lsSet("rh.split","");const a=document.getElementById("split");if(a)a.remove();document.body.classList.remove("split");renderSplitBtn();}
+function renderSplitBtn(){
+  let b=document.getElementById("splitbtn");
+  if(!splitOk()){if(b)b.remove();return;}
+  if(!b){b=document.createElement("button");b.id="splitbtn";b.type="button";b.className="split-btn";$("#nav").after(b);b.onclick=()=>document.body.classList.contains("split")?closeSplit():openSplit();}
+  const on=document.body.classList.contains("split");
+  b.setAttribute("aria-pressed",on?"true":"false"); b.title=on?"לסגור את החלון השני":"חלון כפול: לראות שתי לשוניות זו ליד זו";
+  b.innerHTML='<svg viewBox="0 0 20 16" width="18" height="15" aria-hidden="true"><rect x="1" y="1" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><line x1="10" y1="1.5" x2="10" y2="14.5" stroke="currentColor" stroke-width="1.6"/></svg><span>'+(on?"חלון אחד":"חלון כפול")+'</span>';
+}
+addEventListener("resize",()=>{ if(!splitOk()&&document.body.classList.contains("split")){const a=document.getElementById("split");if(a)a.remove();document.body.classList.remove("split");} renderSplitBtn(); });
 function renderNav(){
   if(S.demo&&!document.getElementById("demobar")){const b=document.createElement("div");b.id="demobar";b.textContent="סביבת הדגמה להדרכה · הנתונים מדומים · שום דבר כאן לא משפיע על המערכת האמיתית";document.body.insertBefore(b,document.body.firstChild);}
   $("#nav").innerHTML=TABS.map(([k,l])=>`<button data-t="${k}" class="${S.tab===k?"on":""}">${l}</button>`).join("");
   $("#nav").querySelectorAll("button").forEach(b=>b.onclick=()=>{S.tab=b.dataset.t;renderNav();render();});
   const le=latestExport();
   $("#meta").textContent=le?`${isGeneral()?"קובץ נתונים אחרון":"ייצוא אחרון"}: ${le.export_date||String(le.uploaded_at||"").slice(0,10)} · לפני ${daysSince(le.uploaded_at)} ימים`:"";
-  renderProj();
+  renderProj(); if(typeof renderSplitBtn==="function") renderSplitBtn();
 }
 function render(){
   if(S.tab==="tasks") S.tab="morning";
@@ -630,6 +694,42 @@ function mPass(i,F){
   if(F.age&&!i.done&&!((i.age??0)>+F.age)) return false;
   return true;
 }
+/* כרטיסי הסיכום: ריחוף מציג את הרשימה, לחיצה פותחת חלון עם הפירוט המלא */
+function statData(items,active,le){
+  const line=i=>({t:i.text,sub:[i.paper?paperName(i.paper):"",i.type].filter(Boolean).join(" · "),pid:i.paper?i.paper.id:""});
+  const L=[{k:"papers",label:"מאמרים פעילים",n:active.length,
+      rows:active.slice().sort((a,b)=>b.stage-a.stage).map(p=>({t:p.short||p.title,sub:`שלב ${p.stage}: ${stageOf(p.stage).name}`+(p.next_step?` · הצעד הבא: ${p.next_step}`:""),pid:p.id}))},
+    {k:"write",label:"כתיבה",n:0,rows:items.filter(i=>i.type==="כתיבה").map(line)},
+    {k:"anal",label:"ניתוחים פתוחים",n:0,rows:items.filter(i=>i.type==="ניתוח").map(line)}];
+  if(!isGeneral()) L.push({k:"clinic",label:"משימות למרפאה",n:0,rows:items.filter(i=>i.type==="מרפאה").map(line)});
+  L.push({k:"exp",label:"ימים מאז הייצוא האחרון",n:le?daysSince(le.uploaded_at):"—",
+    rows:le?[{t:`${isGeneral()?"קובץ נתונים אחרון":"ייצוא אחרון"}: ${dmy(le.export_date||String(le.uploaded_at||"").slice(0,10))}`,sub:[le.rows?`${le.rows} שורות`:"",le.patients?`${le.patients} מטופלים`:"",le.claude_summary||""].filter(Boolean).join(" · ")}]:[{t:"עוד לא נקלט קובץ",sub:""}]});
+  for(const x of L) if(x.k!=="papers"&&x.k!=="exp") x.n=x.rows.length;
+  return L;
+}
+function statCards(items,active,le){
+  S.statL=statData(items,active,le);
+  return `<div class="stats">${S.statL.map((x,ix)=>`<button type="button" class="stat stat-btn" data-stat="${ix}" aria-haspopup="dialog">
+    <span class="muted">${x.label}</span><b>${x.n}</b>
+    ${x.rows.length?`<span class="stat-pop" aria-hidden="true">${x.rows.slice(0,6).map(r=>`<span class="sp-row">${heb(r.t)}</span>`).join("")}${x.rows.length>6?`<span class="sp-more">ועוד ${x.rows.length-6} · לחיצה לפירוט</span>`:`<span class="sp-more">לחיצה לפירוט</span>`}</span>`:""}
+  </button>`).join("")}</div>`;
+}
+function bindStats(){
+  document.querySelectorAll("[data-stat]").forEach(b=>b.onclick=()=>{const x=S.statL[+b.dataset.stat];
+    const bg=document.createElement("div"); bg.className="modal-bg";
+    bg.innerHTML=`<div class="modal" role="dialog" aria-label="${esc(x.label)}" style="max-width:720px">
+      <div class="row"><h2 class="grow">${esc(x.label)} · ${x.n}</h2><button class="ghost" id="x">סגור ✕</button></div>
+      ${x.rows.length?`<ul class="stat-list">${x.rows.map(r=>`<li>${r.pid?`<button type="button" class="linkish" data-open="${esc(r.pid)}">${heb(r.t)}</button>`:`<b>${heb(r.t)}</b>`}${r.sub?`<div class="muted">${heb(r.sub)}</div>`:""}</li>`).join("")}</ul>`:`<p class="muted">אין פריטים.</p>`}
+    </div>`;
+    document.body.appendChild(bg);
+    const close=()=>{bg.remove();document.removeEventListener("keydown",esc_);};
+    const esc_=e=>{if(e.key==="Escape")close();};
+    document.addEventListener("keydown",esc_);
+    bg.onclick=e=>{if(e.target===bg)close();}; bg.querySelector("#x").onclick=close;
+    bg.querySelectorAll("[data-open]").forEach(a=>a.onclick=e=>{e.preventDefault();close();openPaper(a.dataset.open);});
+    bg.querySelector("#x").focus();
+  });
+}
 function addTaskForm(){
   return `<div class="add-task">
     <div class="row">
@@ -669,7 +769,9 @@ function renderMorning(){
   if(S.mKeep&&S.mOrder){const o=new Map(S.mOrder.map((k,ix)=>[k,ix]));rows.sort((a,b)=>(o.has(a.k)?o.get(a.k):1e9)-(o.has(b.k)?o.get(b.k):1e9));}
   S.mKeep=false; S.mOrder=rows.map(r=>r.k);
   const uniq=(c)=>[...new Set(items.map(i=>String(mVal(i,c))))].sort((a,b)=>c==="pr"?b-a:a.localeCompare(b,"he"));
-  const sel=(c,opts)=>`<select class="th-f" data-f="${c}" aria-label="סינון">${[["","הכל"],...opts].map(([v,l])=>`<option value="${esc(v)}" ${F[c]===v?"selected":""}>${esc(l)}</option>`).join("")}</select>`;
+  const tyCls=v=>v===""?"":v==="מרפאה"?"pr-warn":v==="ניתוח"?"ty-acc":v==="כתיבה"?"ty-ok":"pr-gray";
+  const prCls=v=>v===""?"":(+v>=5?"pr-bad":+v>=4?"pr-warn":"pr-gray");
+  const sel=(c,opts)=>`<select class="th-f ${c==="pr"?prCls(F.pr):c==="type"?tyCls(F.type):""}" data-f="${c}" aria-label="סינון">${[["","הכל"],...opts].map(([v,l])=>`<option value="${esc(v)}" ${F[c]===v?"selected":""}>${esc(l)}</option>`).join("")}</select>`;
   const filt={pr:sel("pr",uniq("pr").map(v=>[v,v])),type:sel("type",uniq("type").map(v=>[v,v])),
     text:`<input class="th-f" data-f="text" type="search" placeholder="חיפוש" value="${esc(F.text)}" aria-label="חיפוש בפעולה">`,
     paper:sel("paper",uniq("paper").map(v=>[v,v])),stage:"",age:sel("age",[["7","מעל 7"],["30","מעל 30"]])};
@@ -678,13 +780,7 @@ function renderMorning(){
   const active=S.papers.filter(p=>p.status==="active");
   const byWork=t=>items.filter(i=>i.type===t).length;
   $("#app").innerHTML=`${setupCard()}
-  <div class="stats">
-    <div class="stat"><span class="muted">מאמרים פעילים</span><b>${active.length}</b></div>
-    <div class="stat"><span class="muted">כתיבה</span><b>${byWork("כתיבה")}</b></div>
-    <div class="stat"><span class="muted">ניתוחים פתוחים</span><b>${byWork("ניתוח")}</b></div>
-    ${isGeneral()?"":`<div class="stat"><span class="muted">משימות למרפאה</span><b>${byWork("מרפאה")}</b></div>`}
-    <div class="stat"><span class="muted">ימים מאז הייצוא האחרון</span><b>${le?daysSince(le.uploaded_at):"—"}</b></div>
-  </div>
+  ${statCards(items,active,le)}
   <div class="card">
     <div class="row"><h2 class="grow">מה עושים היום</h2>${anyF?`<button class="ghost" id="mfclear">לנקות סינון</button>`:""}<button class="sec" id="madd" aria-expanded="${S.mAdd?"true":"false"}">${S.mAdd?"סגירה":"+ משימה חדשה"}</button></div>
     ${S.mAdd?addTaskForm():""}
@@ -707,7 +803,7 @@ function renderMorning(){
     </tbody></table>
     ${rows.length?"":`<p class="muted">${anyF?"אין משימות שמתאימות לסינון.":"אין משימות פתוחות."}</p>`}
   </div>`;
-  bindOpen(); bindSetup();
+  bindOpen(); bindSetup(); bindStats();
   document.querySelectorAll("[data-sort]").forEach(b=>b.onclick=()=>{const c=b.dataset.sort;
     S.msort=SO.col===c?{col:c,dir:-SO.dir}:{col:c,dir:(c==="pr"||c==="age")?-1:1}; renderMorning();});
   document.querySelectorAll("select.th-f").forEach(s=>s.onchange=()=>{F[s.dataset.f]=s.value;renderMorning();});
