@@ -87,6 +87,7 @@
     .stat-btn:hover{border-color:var(--accent);box-shadow:0 2px 10px #2f5d8a1a}
     .stat-btn:hover .stat-pop{opacity:1;visibility:visible;transform:none;transition-delay:250ms,250ms,0s}
   }
+  tr.flash td{background:var(--accent-soft);transition:background-color 600ms ease}
   .stat-list{list-style:none;margin:8px 0 0;padding:0}
   .stat-list li{padding:8px 0;border-bottom:1px solid var(--line)}
   .linkish{background:none;border:0;padding:0;color:var(--accent);font:inherit;font-weight:600;cursor:pointer;text-align:right}
@@ -696,7 +697,7 @@ function mPass(i,F){
 }
 /* כרטיסי הסיכום: ריחוף מציג את הרשימה, לחיצה פותחת חלון עם הפירוט המלא */
 function statData(items,active,le){
-  const line=i=>({t:i.text,sub:[i.paper?paperName(i.paper):"",i.type].filter(Boolean).join(" · "),pid:i.paper?i.paper.id:""});
+  const line=i=>({t:i.text,sub:[i.paper?paperName(i.paper):"",i.type].filter(Boolean).join(" · "),gk:i.paper?"p:"+i.paper.id:"t:"+i.type,ik:itemKey(i)});
   const L=[{k:"papers",label:"מאמרים פעילים",n:active.length,
       rows:active.slice().sort((a,b)=>b.stage-a.stage).map(p=>({t:p.short||p.title,sub:`שלב ${p.stage}: ${stageOf(p.stage).name}`+(p.next_step?` · הצעד הבא: ${p.next_step}`:""),pid:p.id}))},
     {k:"write",label:"כתיבה",n:0,rows:items.filter(i=>i.type==="כתיבה").map(line)},
@@ -719,7 +720,7 @@ function bindStats(){
     const bg=document.createElement("div"); bg.className="modal-bg";
     bg.innerHTML=`<div class="modal" role="dialog" aria-label="${esc(x.label)}" style="max-width:720px">
       <div class="row"><h2 class="grow">${esc(x.label)} · ${x.n}</h2><button class="ghost" id="x">סגור ✕</button></div>
-      ${x.rows.length?`<ul class="stat-list">${x.rows.map(r=>`<li>${r.pid?`<button type="button" class="linkish" data-open="${esc(r.pid)}">${heb(r.t)}</button>`:`<b>${heb(r.t)}</b>`}${r.sub?`<div class="muted">${heb(r.sub)}</div>`:""}</li>`).join("")}</ul>`:`<p class="muted">אין פריטים.</p>`}
+      ${x.rows.length?`<ul class="stat-list">${x.rows.map((r,rx)=>`<li>${r.gk?`<button type="button" class="linkish" data-goto="${rx}" title="להציג את המשימה בלוח הבוקר">${heb(r.t)}</button>`:r.pid?`<button type="button" class="linkish" data-open="${esc(r.pid)}">${heb(r.t)}</button>`:`<b>${heb(r.t)}</b>`}${r.sub?`<div class="muted">${heb(r.sub)}</div>`:""}</li>`).join("")}</ul>`:`<p class="muted">אין פריטים.</p>`}
     </div>`;
     document.body.appendChild(bg);
     const close=()=>{bg.remove();document.removeEventListener("keydown",esc_);};
@@ -727,6 +728,10 @@ function bindStats(){
     document.addEventListener("keydown",esc_);
     bg.onclick=e=>{if(e.target===bg)close();}; bg.querySelector("#x").onclick=close;
     bg.querySelectorAll("[data-open]").forEach(a=>a.onclick=e=>{e.preventDefault();close();openPaper(a.dataset.open);});
+    /* משימה מהרשימה: מציגים אותה בשורה שלה בלוח (בלי סינון), גוללים אליה ומדגישים לרגע */
+    bg.querySelectorAll("[data-goto]").forEach(a=>a.onclick=()=>{const r=x.rows[+a.dataset.goto]; close();
+      S.rowPos=S.rowPos||{}; S.rowPos[r.gk]=r.ik; S.mf={pr:"",type:"",text:"",paper:"",age:""}; renderMorning();
+      const tr=document.querySelector(`tr[data-gk="${CSS.escape(r.gk)}"]`); if(tr){tr.scrollIntoView({block:"center",behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"}); tr.classList.add("flash"); setTimeout(()=>tr.classList.remove("flash"),1600);} });
     bg.querySelector("#x").focus();
   });
 }
@@ -789,7 +794,7 @@ function renderMorning(){
       `<th><button class="th-sort ${SO.col===c?"on":""}" data-sort="${c}" title="מיון">${l}<span class="th-ar">${SO.col===c?(SO.dir<0?"▼":"▲"):"↕"}</span></button></th>`).join("")}<th></th></tr>
       <tr class="th-filters">${MCOLS.map(([c])=>`<td>${filt[c]}</td>`).join("")}<td></td></tr></thead><tbody>
     ${rows.map((r,rx)=>{const i=r.cur; const pos=i.done?`בוצעה ${r.x+1}/${r.nDone}`:`${r.x-r.nDone+1}/${r.nOpen}`;
-      return `<tr>
+      return `<tr data-gk="${esc(r.k)}">
       <td>${prBadge(i.pr)}</td>
       <td>${itemType(i)}</td>
       <td><b>${heb(i.text)}</b>${i.done&&i.at?` <span class="muted">· ${esc(dmy(i.at))}</span>`:""}${i.extra.length?`<div class="muted">חסר: ${i.extra.map(heb).join(" · ")}</div>`:""}${i.flag?`<div><span class="pill warn">${heb(i.flag)}</span></div>`:""}</td>
