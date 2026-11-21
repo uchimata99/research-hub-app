@@ -39,6 +39,23 @@
   button.ghost{background:transparent;color:var(--muted);padding:4px 8px;white-space:nowrap}
   button.done-btn{background:#fff;color:var(--accent);border:1px solid var(--line);border-radius:8px;padding:4px 10px;font-size:13px;white-space:nowrap;cursor:pointer}
   button.done-btn:hover{border-color:var(--accent);background:#f3f7fb}
+  .done-btn{transition:background-color 150ms ease,color 150ms ease,border-color 150ms ease,transform 150ms cubic-bezier(0.23,1,0.32,1)}
+  button.done-btn:active,.nav-arrow:active{transform:scale(0.97)}
+  .done-btn.is-done{display:inline-block;background:var(--ok);color:#fff;border:1px solid var(--ok);border-radius:8px;padding:4px 10px;font-size:13px;font-weight:600;white-space:nowrap}
+  button.done-btn.is-done:hover{background:var(--ok);filter:brightness(1.08);border-color:var(--ok)}
+  tr.row-done td{background:var(--ok-soft)} tr.row-done b{color:var(--muted);font-weight:500}
+  .focus{border-inline-start:4px solid var(--accent)}
+  .focus.is-done{border-inline-start-color:var(--ok)}
+  .focus-top{display:flex;justify-content:space-between;gap:12px;font-size:13px;margin-bottom:8px}
+  .focus-text{font-size:17px;font-weight:600;margin:8px 0 4px;line-height:1.5}
+  .focus.is-done .focus-text{color:var(--muted)}
+  .focus-nav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;flex-wrap:wrap}
+  .focus-nav .done-btn{font-size:14px;padding:7px 16px}
+  .nav-arrow{background:#fff;color:var(--accent);border:1px solid var(--line);border-radius:8px;padding:7px 14px;font-size:14px;transition:background-color 150ms ease,border-color 150ms ease,transform 150ms cubic-bezier(0.23,1,0.32,1)}
+  .nav-arrow:disabled{opacity:.4;cursor:default}
+  .nav-arrow.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  @media (hover:hover) and (pointer:fine){ .nav-arrow:not(:disabled):not(.primary):hover{border-color:var(--accent);background:#f3f7fb} }
+  @media (prefers-reduced-motion:reduce){ .done-btn,.nav-arrow{transition:none} button.done-btn:active,.nav-arrow:active{transform:none} }
   button:disabled{opacity:.4;cursor:not-allowed}
   input,select,textarea{font:inherit;padding:7px 9px;border:1px solid #cfccc5;border-radius:8px;background:#fff}
   textarea{width:100%;min-height:70px}
@@ -550,13 +567,67 @@ function bindSetup(){
     S.chatKey="_main"; S.tab="claude"; renderNav(); render(); await loadChat(); sendChat(cmd);
   });
 }
+/* פריטים שבוצעו: משימות, ניתוחים, וצעדים במאמרים (מתוך ההיסטוריה). מהישן לחדש */
+function doneItems(){
+  const out=[];
+  for(const t of S.tasks) if(t.status==="done")
+    out.push({kind:"task",done:true,at:t.done_at||"",type:t.type,text:t.title,paper:paperById(t.paper),pr:t.priority||3,tid:t.id,extra:[]});
+  for(const p of S.papers){
+    for(const a of (p.analyses||[])) if(a.status==="done")
+      out.push({kind:"analysis",done:true,at:a.done_at||"",type:"ניתוח",text:a.name,paper:p,pr:p.priority||3,aid:a.id,extra:[]});
+    for(const h of (p.history||[])) if(/^בוצע: /.test(h.event||""))
+      out.push({kind:"next",done:true,at:String(h.at||"").slice(0,10),hat:h.at,type:stageOf(p.stage).work,text:h.event.slice(6),paper:p,pr:p.priority||3,extra:[]});
+  }
+  return out.sort((a,b)=>String(a.at).localeCompare(String(b.at)));
+}
+const itemKey=i=>[i.done?"d":"o",i.kind,i.tid||i.aid||"",i.paper?i.paper.id:"",i.hat||"",(i.kind==="next"&&!i.done)?"":i.text].join("|");
+async function markDone(i){
+  if(i.kind==="task"){const t=S.tasks.find(x=>x.id===i.tid);t.status="done";t.done_at=today();await saveTasks();
+    return itemKey({...i,done:true});}
+  if(i.kind==="analysis"){const a=i.paper.analyses.find(x=>x.id===i.aid);a.status="done";a.done_at=today();addHistory(i.paper,`ניתוח הושלם: ${a.name}`);await savePaper(i.paper);
+    return itemKey({...i,done:true});}
+  const n=prompt("מה הצעד הבא במאמר?",""); if(n===null) return null;
+  addHistory(i.paper,`בוצע: ${i.paper.next_step}`); const h=i.paper.history[i.paper.history.length-1];
+  i.paper.next_step=n; await savePaper(i.paper);
+  return itemKey({kind:"next",done:true,paper:i.paper,hat:h.at,text:h.event.slice(6)});
+}
+async function reopen(i){
+  if(i.kind==="task"){const t=S.tasks.find(x=>x.id===i.tid);t.status="open";t.done_at=null;await saveTasks();return itemKey({...i,done:false});}
+  if(i.kind==="analysis"){const a=i.paper.analyses.find(x=>x.id===i.aid);a.status="open";a.done_at=null;addHistory(i.paper,`ניתוח נפתח מחדש: ${a.name}`);await savePaper(i.paper);return itemKey({...i,done:false});}
+  return null;
+}
+function itemType(i){return `<span class="pill ${i.type==="מרפאה"?"warn":i.type==="ניתוח"?"":i.type==="כתיבה"?"ok":"gray"}">${esc(i.type)}</span>`;}
+function doneBtn(i,attr){
+  if(!i.done) return `<button class="done-btn" ${attr} title="לחיצה מסמנת את המשימה כבוצעה">לסמן כבוצע</button>`;
+  return i.kind==="next"?`<span class="done-btn is-done" title="הצעד נרשם בהיסטוריה של המאמר">✓ בוצע</span>`
+    :`<button class="done-btn is-done" ${attr} title="בוצע. לחיצה פותחת את המשימה מחדש">✓ בוצע</button>`;
+}
 function renderMorning(){
   const items=morningItems(); const types=["הכל",...new Set(items.map(i=>i.type))];
-  const f=S.morningFilter||"הכל";
-  const shown=items.filter(i=>f==="הכל"||i.type===f);
+  const f=S.morningFilter||"הכל"; const byF=i=>f==="הכל"||i.type===f;
+  const shown=items.filter(byF);
+  const done=doneItems().filter(byF);
+  const lt=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
+  const doneToday=done.filter(i=>i.at===today()||i.at===lt).reverse();
+  /* כרטיס המשימה הנוכחית: אחורה עוברים על מה שבוצע, קדימה על מה שפתוח */
+  const seq=done.concat(shown);
+  let fx=seq.findIndex(i=>itemKey(i)===S.focusKey); if(fx<0) fx=Math.min(done.length,seq.length-1);
+  const cur=seq[fx];
   const le=latestExport();
   const active=S.papers.filter(p=>p.status==="active");
   const byWork=t=>items.filter(i=>i.type===t).length;
+  const focus=cur?`<div class="card focus ${cur.done?"is-done":""}">
+    <div class="focus-top"><span class="muted">${cur.done?`בוצע${cur.at?" · "+esc(dmy(cur.at)):""}`:"המשימה הנוכחית"}</span>
+      <span class="muted">${fx<done.length?`בוצעה ${fx+1} מתוך ${done.length}`:`${fx-done.length+1} מתוך ${shown.length} פתוחות`}</span></div>
+    <div class="focus-body">${prBadge(cur.pr)} ${itemType(cur)} ${cur.paper?paperChip(cur.paper):""}
+      <div class="focus-text">${heb(cur.text)}</div>
+      ${cur.extra.length?`<div class="muted">חסר: ${cur.extra.map(heb).join(" · ")}</div>`:""}</div>
+    <div class="focus-nav">
+      <button class="nav-arrow" id="fprev" ${fx<=0?"disabled":""} aria-label="המשימה הקודמת">→ הקודמת</button>
+      ${doneBtn(cur,`id="fdone"`)}
+      <button class="nav-arrow ${cur.done&&fx<seq.length-1?"primary":""}" id="fnext" ${fx>=seq.length-1?"disabled":""} aria-label="המשימה הבאה">הבאה ←</button>
+    </div></div>`:"";
+  const rows=shown.concat(doneToday);
   $("#app").innerHTML=`${setupCard()}
   <div class="stats">
     <div class="stat"><span class="muted">מאמרים פעילים</span><b>${active.length}</b></div>
@@ -565,30 +636,32 @@ function renderMorning(){
     ${isGeneral()?"":`<div class="stat"><span class="muted">משימות למרפאה</span><b>${byWork("מרפאה")}</b></div>`}
     <div class="stat"><span class="muted">ימים מאז הייצוא האחרון</span><b>${le?daysSince(le.uploaded_at):"—"}</b></div>
   </div>
+  ${focus}
   <div class="card">
     <div class="row"><h2 class="grow">מה עושים היום</h2>
       <select id="mf">${types.map(t=>`<option ${t===f?"selected":""}>${t}</option>`).join("")}</select></div>
     <table><thead><tr><th>עדיפות</th><th>סוג</th><th>פעולה</th><th>מאמר</th><th>שלב</th><th>ימים</th><th></th></tr></thead><tbody>
-    ${shown.map((i,ix)=>`<tr>
+    ${rows.map((i,ix)=>`<tr class="${i.done?"row-done":""}">
       <td>${prBadge(i.pr)}</td>
-      <td><span class="pill ${i.type==="מרפאה"?"warn":i.type==="ניתוח"?"":i.type==="כתיבה"?"ok":"gray"}">${esc(i.type)}</span></td>
+      <td>${itemType(i)}</td>
       <td><b>${heb(i.text)}</b>${i.extra.length?`<div class="muted">חסר: ${i.extra.map(heb).join(" · ")}</div>`:""}${i.flag?`<div><span class="pill warn">${heb(i.flag)}</span></div>`:""}</td>
       <td>${i.paper?paperChip(i.paper):"—"}</td>
       <td>${i.paper?miniStages(i.paper.stage):""}</td>
-      <td>${i.age??""}</td>
-      <td><button class="done-btn" data-done="${ix}" title="המשימה עדיין פתוחה. לחיצה מסמנת אותה כבוצעה ומורידה אותה מהרשימה">לסמן כבוצע</button></td></tr>`).join("")}
+      <td>${i.done?"":(i.age??"")}</td>
+      <td>${doneBtn(i,`data-row="${ix}"`)}</td></tr>`).join("")}
     </tbody></table>
-    ${shown.length?"":`<p class="muted">אין פריטים.</p>`}
+    ${shown.length?"":`<p class="muted">אין משימות פתוחות.</p>`}
   </div>`;
   $("#mf").onchange=e=>{S.morningFilter=e.target.value;renderMorning();};
   bindOpen(); bindSetup();
-  document.querySelectorAll("[data-done]").forEach(b=>b.onclick=async()=>{
-    const i=shown[+b.dataset.done];
-    if(i.kind==="task"){const t=S.tasks.find(x=>x.id===i.tid);t.status="done";t.done_at=today();await saveTasks();}
-    else if(i.kind==="analysis"){const a=i.paper.analyses.find(x=>x.id===i.aid);a.status="done";addHistory(i.paper,`ניתוח הושלם: ${a.name}`);await savePaper(i.paper);}
-    else { const n=prompt("מה הצעד הבא במאמר?",""); if(n===null) return; addHistory(i.paper,`בוצע: ${i.paper.next_step}`); i.paper.next_step=n; await savePaper(i.paper);}
-    toast("נשמר"); renderMorning();
-  });
+  const act=async(i)=>{ const k=i.done?await reopen(i):await markDone(i); if(k===null&&!i.done) return;
+    if(k) S.focusKey=k; toast(i.done?"נפתח מחדש":"סומן כבוצע"); renderMorning(); };
+  document.querySelectorAll("[data-row]").forEach(b=>b.onclick=()=>act(rows[+b.dataset.row]));
+  if(cur){
+    const go=d=>{const n=seq[fx+d]; if(n){S.focusKey=itemKey(n); renderMorning();}};
+    $("#fprev").onclick=()=>go(-1); $("#fnext").onclick=()=>go(1);
+    const fd=$("#fdone"); if(fd&&fd.tagName==="BUTTON") fd.onclick=()=>act(cur);
+  }
 }
 const short=t=>t.length>48?t.slice(0,46)+"…":t;
 /* כפתור מאמר: שם קצר, הכותרת המלאה בריחוף */
@@ -982,7 +1055,7 @@ function renderTasks(){
       <td>${t.status==="done"?`<s>${heb(t.title)}</s>`:`<b>${heb(t.title)}</b>`}${t.note?`<div class="muted">${heb(t.note)}</div>`:""}</td>
       <td>${t.paper?paperChip(paperById(t.paper)||{id:t.paper,title:t.paper}):"—"}</td>
       <td class="muted">${esc(t.created_at)}</td>
-      <td>${t.status==="open"?`<button class="done-btn" data-td="${t.id}">לסמן כבוצע</button>`:`<button class="ghost" data-tr="${t.id}">פתח מחדש</button>`}</td></tr>`).join("")}
+      <td>${t.status==="open"?`<button class="done-btn" data-td="${t.id}">לסמן כבוצע</button>`:`<button class="done-btn is-done" data-tr="${t.id}" title="בוצע. לחיצה פותחת את המשימה מחדש">✓ בוצע</button>`}</td></tr>`).join("")}
     </tbody></table></div>`;
   $("#sd").onchange=e=>{S.showDone=e.target.checked;renderTasks();};
   $("#tadd").onclick=async()=>{const title=$("#tt").value.trim();if(!title)return;
