@@ -228,6 +228,19 @@
   .split-bar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--card)}
   .split-bar select{font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:6px}
   #split iframe{flex:1;width:100%;border:0;background:var(--bg)}
+  /* סיור מודרך: הדגשה של חלק אחד במסך ושלט עם הסבר */
+  .tour-spot{position:fixed;z-index:9000;pointer-events:none;border-radius:10px;box-shadow:0 0 0 2px var(--accent),0 0 0 9999px #0f1a2a8c}
+  .tour-tip{position:fixed;z-index:9001;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:14px 18px 12px;box-shadow:0 14px 44px #0f1a2a40,0 2px 6px #0f1a2a1f}
+  .tour-spot.moving,.tour-tip.moving{transition:left 240ms cubic-bezier(0.23,1,0.32,1),top 240ms cubic-bezier(0.23,1,0.32,1),width 240ms cubic-bezier(0.23,1,0.32,1),height 240ms cubic-bezier(0.23,1,0.32,1)}
+  .tour-tip .tour-body{animation:tourin 200ms cubic-bezier(0.23,1,0.32,1)}
+  @keyframes tourin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  .tour-tip h3{margin:2px 0 6px;font-size:16px}
+  .tour-tip p{margin:0 0 12px;line-height:1.6;font-size:14px}
+  .tour-n{font-size:12px;color:var(--muted)}
+  .tour-x{position:absolute;top:8px;left:8px;background:none;border:0;color:var(--muted);font-size:15px;line-height:1;padding:6px;border-radius:6px;cursor:pointer}
+  .tour-note{margin:0 0 10px}
+  .tour-note textarea{width:100%;box-sizing:border-box;font:inherit;color:var(--ink);padding:6px 8px;border:1px solid var(--line);border-radius:6px;resize:vertical;margin-bottom:6px}
+  @media (prefers-reduced-motion:reduce){ .tour-spot.moving,.tour-tip.moving{transition:none} .tour-tip .tour-body{animation:none} }
   .split-grip{position:absolute;top:0;bottom:0;right:-7px;width:12px;cursor:col-resize;z-index:6;touch-action:none;display:flex;align-items:center;justify-content:center}
   .split-grip::after{content:"";width:4px;height:44px;border-radius:3px;background:#b9c2cc;transition:background-color 150ms ease,height 150ms cubic-bezier(0.23,1,0.32,1)}
   @media (hover:hover) and (pointer:fine){ .split-grip:hover::after{background:var(--accent);height:64px} }
@@ -636,12 +649,110 @@ function openSplit(tab){
 }
 function closeSplit(){lsSet("rh.split","");const a=document.getElementById("split");if(a)a.remove();document.body.classList.remove("split");renderSplitBtn();}
 function renderSplitBtn(){
+  renderTourBtn();
   let b=document.getElementById("splitbtn");
   if(!splitOk()){if(b)b.remove();return;}
   if(!b){b=document.createElement("button");b.id="splitbtn";b.type="button";b.className="split-btn";$("#nav").after(b);b.onclick=()=>document.body.classList.contains("split")?closeSplit():openSplit();}
   const on=document.body.classList.contains("split");
   b.setAttribute("aria-pressed",on?"true":"false"); b.title=on?"לסגור את החלון השני":"חלון כפול: לראות שתי לשוניות זו ליד זו";
   b.innerHTML='<svg viewBox="0 0 20 16" width="18" height="15" aria-hidden="true"><rect x="1" y="1" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><line x1="10" y1="1.5" x2="10" y2="14.5" stroke="currentColor" stroke-width="1.6"/></svg><span>'+(on?"חלון אחד":"חלון כפול")+'</span>';
+}
+/* ============ סיור מודרך בלוח ============
+   הסיור רק מראה: מדגיש חלק במסך ומסביר אותו. שום דבר לא משתנה. הערה מכל שלב נשמרת בקובץ המשוב של ההדרכה.
+   שלב בלי בורר = שלט במרכז המסך. שלב שהחלק שלו לא קיים כרגע (למשל המתג, שמופיע רק במחשב הבית) מדולג. */
+const TOURS={
+  morning:[
+    {t:"סיור בלוח הבוקר",x:"כאן רואים בבוקר מה עושים היום, בכל המאמרים והמשימות. הסיור רק מראה ולא משנה כלום. מעבר בין השלבים: «הבא» ו«הקודם», או החצים במקלדת. על כל שלב אפשר להעיר בכפתור «הערה»."},
+    {sel:"#proj",t:"בחירת פרויקט",x:"שם הפרויקט הפתוח. לחיצה פותחת תפריט: מעבר לפרויקט אחר, שינוי שם או פרויקט חדש. לכל פרויקט מאמרים, משימות ונתונים משלו."},
+    {sel:"#nav",t:"הלשוניות",x:"לוח בוקר, מאמרים, נתונים, ספרייה וקלוד. הלשונית הפתוחה מודגשת. הכותרת נשארת למעלה גם בגלילה."},
+    {sel:"#splitbtn",t:"חלון כפול",x:"פותח לשונית שנייה בחצי השמאלי של המסך, למשל הלוח ליד טבלת המאמרים. את הקו שבין החלונות אפשר לגרור כדי להרחיב אחד מהם."},
+    {sel:"#eng",t:"מצב המנוע",x:"נקודה ירוקה: המנוע שמריץ את הניתוחים מחובר. בעבודה מרחוק כתוב כאן שהחיבור הוא לשרת בבית."},
+    {sel:"#srvsw",t:"קלוד ומצב שרת",x:"הסמל הכתום פותח את השיחה הראשית עם קלוד. המתג מעביר את המחשב בבית למצב שרת, כדי לעבוד דרכו מהלפטופ. מופיע רק במחשב הבית עצמו."},
+    {sel:".stats",t:"כרטיסי הסיכום",x:"מאמרים פעילים, מאמרים בכתיבה, ניתוחים פתוחים, משימות מרפאה וימים מאז הייצוא האחרון. מעבר עם העכבר מראה את הפריטים הראשונים; לחיצה פותחת חלון עם הרשימה המלאה."},
+    {sel:".mtable thead",t:"מיון וסינון",x:"לחיצה על שם עמודה ממיינת לפיה, ולחיצה נוספת הופכת את הסדר. מתחת לכל שם יש סינון: רשימה לבחירה או חיפוש חופשי. «לנקות סינון» מחזיר הכול."},
+    {sel:".mtable tbody tr:first-child",t:"שורה לכל מאמר",x:"כל שורה מראה פריט אחד של מאמר: הצעד הבא, ניתוח פתוח או משימה. מימין עדיפות וסוג, אחר כך מה עושים ומה חסר, המאמר, השלב, וכמה ימים הפריט ממתין."},
+    {sel:".mtable tbody tr:first-child td:nth-child(3)",t:"פתיחת כרטיס",x:"לחיצה על הטקסט פותחת כרטיס: משימה נפתחת בכרטיס משימה, צעד או ניתוח בכרטיס המאמר. אפשר לפתוח כמה כרטיסים יחד ולגרור אותם בשורת הכותרת שלהם."},
+    {sel:".mtable tbody tr:first-child td:nth-child(5)",t:"השלב",x:"תשעת השלבים של המאמר, מרעיון ועד קבלה. מעבר לשלב הבא הוא החלטה בשער השלב, בכרטיס המאמר; השלמת משימות לא מעבירה שלב מעצמה."},
+    {sel:".mtable tbody tr:first-child .row-nav",t:"החצים והכפתור «בוצע»",x:"החץ השמאלי עובר לפריט הפתוח הבא של אותו מאמר, למשל כשהנוכחי תקוע. החץ הימני חוזר לפריטים שכבר בוצעו. «לסמן כבוצע» צובע את הכפתור בירוק, ולחיצה נוספת פותחת מחדש."},
+    {sel:"#madd",t:"משימה חדשה",x:"מוסיף משימה: מה לעשות, סוג, מאמר ועדיפות. היא מופיעה מיד בשורה של המאמר."},
+    {sel:"#tourbtn",t:"סוף הסיור",x:"מכאן אפשר לפתוח את הסיור שוב. לשאלות: לשונית קלוד, השיחה «הדרכה»."}
+  ]
+};
+let TOUR=null;
+function renderTourBtn(){
+  if(TOUR&&TOUR.tab!==S.tab) endTour();
+  let b=document.getElementById("tourbtn");
+  if(EMBED||!TOURS[S.tab]){ if(b) b.remove(); return; }
+  if(!b){ b=document.createElement("button"); b.id="tourbtn"; b.type="button"; b.className="split-btn"; b.title="סיור מודרך בלשונית הזו";
+    b.innerHTML='<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><circle cx="8" cy="8" r="6.7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6.1 6.2a2 2 0 1 1 2.6 1.9c-.5.2-.7.5-.7 1v.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11.6" r=".9" fill="currentColor"/></svg><span>סיור</span>';
+    b.onclick=()=>startTour(S.tab); $("#nav").after(b); }
+}
+function startTour(tab){
+  endTour();
+  const steps=TOURS[tab].filter(x=>!x.sel||document.querySelector(x.sel)); if(!steps.length) return;
+  const spot=document.createElement("div"); spot.className="tour-spot";
+  const tip=document.createElement("div"); tip.className="tour-tip"; tip.setAttribute("role","dialog"); tip.setAttribute("aria-label","סיור מודרך");
+  document.body.append(spot,tip);
+  const key=e=>{ if(!TOUR) return;
+    if(e.target.closest&&e.target.closest(".tour-note")){ if(e.key==="Escape"){e.preventDefault();e.stopImmediatePropagation();tourAct("cancel");} return; }
+    if(e.key==="Escape"){e.preventDefault();e.stopImmediatePropagation();endTour();}
+    else if(e.key==="ArrowLeft"){e.preventDefault();tourGo(1);}
+    else if(e.key==="ArrowRight"){e.preventDefault();tourGo(-1);} };
+  TOUR={tab,steps,i:0,spot,tip,key,raf:0,el:null};
+  addEventListener("keydown",key,true);
+  tourShow();
+  const loop=()=>{ if(!TOUR) return; tourPlace(); TOUR.raf=requestAnimationFrame(loop); }; loop();
+}
+function tourShow(){
+  const T=TOUR, st=T.steps[T.i], n=T.steps.length;
+  T.tip.innerHTML=`<div class="tour-body"><div class="tour-n">${T.i+1} מתוך ${n}</div><h3>${st.t}</h3><p>${st.x}</p>
+    <div class="tour-note hidden"><textarea rows="3" aria-label="הערה על השלב הזה" placeholder="מה לא ברור, מה לשנות או להוסיף"></textarea>
+      <div class="row"><button class="sec" data-tn="save">לשמור הערה</button><button class="ghost" data-tn="cancel">ביטול</button></div></div>
+    <div class="row"><button class="ghost" data-tn="note">הערה</button><span class="grow"></span>
+      <button class="ghost" data-tn="prev" ${T.i?"":"disabled"}>הקודם</button><button data-tn="next">${T.i<n-1?"הבא":"סיום"}</button></div></div>
+    <button class="tour-x" data-tn="x" aria-label="לסגור את הסיור" title="לסגור (Esc)">✕</button>`;
+  T.tip.querySelectorAll("[data-tn]").forEach(b=>b.onclick=()=>tourAct(b.dataset.tn));
+  T.el=st.sel?document.querySelector(st.sel):null;
+  if(T.el&&!T.el.closest("header")) T.el.scrollIntoView({block:"center",behavior:matchMedia("(prefers-reduced-motion:reduce)").matches?"auto":"smooth"});
+  for(const e of [T.spot,T.tip]){ e.classList.add("moving"); clearTimeout(e._mv); e._mv=setTimeout(()=>e.classList.remove("moving"),260); }
+  T.tip.querySelector('[data-tn="next"]').focus({preventScroll:true});
+}
+function tourPlace(){
+  const T=TOUR, st=T.steps[T.i];
+  if(st.sel&&(!T.el||!T.el.isConnected)) T.el=document.querySelector(st.sel);
+  const tw=Math.min(380,innerWidth-24); T.tip.style.width=tw+"px"; const th=T.tip.offsetHeight;
+  if(!T.el){ Object.assign(T.spot.style,{left:innerWidth/2+"px",top:innerHeight/2+"px",width:"0px",height:"0px"});
+    T.tip.style.left=(innerWidth-tw)/2+"px"; T.tip.style.top=Math.max(12,(innerHeight-th)/2)+"px"; return; }
+  const r=T.el.getBoundingClientRect(), pad=6, gap=12;
+  Object.assign(T.spot.style,{left:r.left-pad+"px",top:r.top-pad+"px",width:r.width+2*pad+"px",height:r.height+2*pad+"px"});
+  let top=r.bottom+pad+gap;
+  if(top+th>innerHeight-8) top=r.top-pad-gap-th;
+  if(top<8) top=Math.max(8,Math.min(innerHeight-th-8,r.top+pad+gap));
+  T.tip.style.top=top+"px";
+  T.tip.style.left=Math.max(12,Math.min(innerWidth-tw-12,r.right-tw))+"px";
+}
+function tourGo(d){ const T=TOUR; if(!T) return; const j=T.i+d; if(j<0||j>=T.steps.length) return; T.i=j; tourShow(); }
+function endTour(){ if(!TOUR) return; cancelAnimationFrame(TOUR.raf); removeEventListener("keydown",TOUR.key,true); TOUR.spot.remove(); TOUR.tip.remove(); TOUR=null; }
+async function tourAct(a){
+  const T=TOUR; if(!T) return;
+  if(a==="next") return T.i<T.steps.length-1?tourGo(1):endTour();
+  if(a==="prev") return tourGo(-1);
+  if(a==="x") return endTour();
+  const box=T.tip.querySelector(".tour-note"), ta=box.querySelector("textarea");
+  if(a==="note"){ box.classList.remove("hidden"); ta.focus(); return; }
+  if(a==="cancel"){ box.classList.add("hidden"); T.tip.querySelector('[data-tn="next"]').focus({preventScroll:true}); return; }
+  if(a==="save"){ const txt=ta.value.trim(); if(!txt){ ta.focus(); return; }
+    const tabName=(TABS.find(([k])=>k===T.tab)||[,T.tab])[1];
+    try{ await saveTourNote(`${tabName} · שלב ${T.i+1}: ${T.steps[T.i].t}`,txt);
+      ta.value=""; box.classList.add("hidden"); toast("ההערה נשמרה. השיחה הראשית תטפל בה."); }
+    catch(e){ toast(e.message||"ההערה לא נשמרה"); } }
+}
+async function saveTourNote(where,text){
+  if(!ENG) throw new Error("שמירת הערות עובדת כשהלוח פתוח דרך המנוע");
+  const r=await fetch("/tour/note",{method:"POST",cache:"no-store",headers:{"X-Token":window.RUNNER_TOKEN,"Content-Type":"application/json"},body:JSON.stringify({where,text})});
+  if(r.status===404) throw new Error("כדי לשמור הערות צריך להפעיל מחדש את המנוע (קיצור הדרך בשולחן העבודה)");
+  if(r.status===403) throw new Error("המנוע הופעל מחדש מאז שהדף נפתח. צריך לרענן את הדף.");
+  if(!r.ok) throw new Error("ההערה לא נשמרה");
 }
 addEventListener("resize",()=>{ if(!splitOk()&&document.body.classList.contains("split")){const a=document.getElementById("split");if(a)a.remove();document.body.classList.remove("split");} renderSplitBtn(); });
 function renderNav(){
