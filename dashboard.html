@@ -613,6 +613,12 @@ async function start(){
   }
   try{ await loadAll(); }catch(e){
     if(S.project!=="clinic"){ S.project="clinic"; PROJ=ROOT; lsSet("rh.project","clinic"); return start(); }
+    /* המנוע לא עונה (כבה, או הופעל מחדש): הודעה ברורה, ובדיקה כל חמש שניות; כשהוא חוזר הדף נטען מעצמו */
+    if(ENG&&e instanceof TypeError){
+      $("#app").innerHTML=`<div class="card"><h2>המנוע לא עונה</h2><p>הלוח מחכה למנוע ויטען מעצמו כשהוא יחזור. אם זה לא קורה תוך דקה: להפעיל את קיצור הדרך «מרכז המחקר» בשולחן העבודה.${location.hostname.endsWith("research-room.net")?" מרחוק: המחשב בבית צריך להיות דלוק ובמצב שרת.":""}</p><p class="muted" id="engwait">בודק…</p></div>`;
+      let n=0; const t=setInterval(async()=>{ n++; const w=document.getElementById("engwait"); if(w) w.textContent="בדיקה "+n+"…";
+        try{ const r=await fetch("/status",{cache:"no-store"}); if(r.ok){ clearInterval(t); location.reload(); } }catch(_){} },5000);
+      return; }
     $("#app").innerHTML=`<div class="card"><h2>שגיאה בקריאת התיקייה</h2><pre class="code">${esc(e.message)}</pre></div>`; return; }
   if(EMBED&&QP.get("tab")&&TABS.some(([k])=>k===QP.get("tab"))) S.tab=QP.get("tab");
   renderNav(); render(); runnerCheck(); setInterval(runnerCheck,30000);
