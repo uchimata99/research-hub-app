@@ -223,11 +223,16 @@
   .split-btn{display:inline-flex;align-items:center;gap:6px;background:transparent;color:#c3cfdd;border:1px solid #ffffff26;border-radius:8px;padding:5px 10px;font-size:13px;transition:background-color 150ms ease,color 150ms ease}
   .split-btn[aria-pressed="true"]{background:#ffffff1c;color:#fff;border-color:#ffffff40}
   @media (hover:hover) and (pointer:fine){ .split-btn:hover{background:#ffffff12;color:#fff} }
-  body.split main{max-width:none;margin:0 0 0 50%;padding:16px}
-  #split{position:fixed;left:0;top:var(--hdr-bot,var(--hdr-h,56px));bottom:0;width:50%;display:flex;flex-direction:column;border-right:2px solid var(--line);background:var(--bg);z-index:5}
+  body.split main{max-width:none;margin:0 0 0 var(--split-w,50%);padding:16px}
+  #split{position:fixed;left:0;top:var(--hdr-bot,var(--hdr-h,56px));bottom:0;width:var(--split-w,50%);display:flex;flex-direction:column;border-right:2px solid var(--line);background:var(--bg);z-index:5}
   .split-bar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--card)}
   .split-bar select{font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:6px}
   #split iframe{flex:1;width:100%;border:0;background:var(--bg)}
+  .split-grip{position:absolute;top:0;bottom:0;right:-7px;width:12px;cursor:col-resize;z-index:6;touch-action:none;display:flex;align-items:center;justify-content:center}
+  .split-grip::after{content:"";width:4px;height:44px;border-radius:3px;background:#b9c2cc;transition:background-color 150ms ease,height 150ms cubic-bezier(0.23,1,0.32,1)}
+  @media (hover:hover) and (pointer:fine){ .split-grip:hover::after{background:var(--accent);height:64px} }
+  .split-grip:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  body.split-drag{cursor:col-resize;user-select:none} body.split-drag iframe{pointer-events:none} body.split-drag .split-grip::after{background:var(--accent);height:64px}
   /* ===== כותרת קבועה ===== */
   :root{--ease-out:cubic-bezier(0.23,1,0.32,1);--hdr-bg:#1b2a3f}
   header{position:sticky;top:0;z-index:15;background:var(--hdr-bg);padding:10px 20px;gap:14px;border-bottom:1px solid #ffffff14;transition:box-shadow 200ms ease}
@@ -602,6 +607,10 @@ async function start(){
 }
 /* חלון כפול: רק כשהלוח רץ מהמנוע (הלפטופ דרך השרת, או המחשב בבית), ובמסך רחב */
 function splitOk(){return ENG&&!EMBED&&innerWidth>=1100;}
+/* רוחב החלון השני באחוזים: 25 עד 75, נשמר בדפדפן */
+let splitW=50;
+function setSplitW(p){ splitW=Math.max(25,Math.min(75,p)); document.documentElement.style.setProperty("--split-w",splitW+"%");
+  const g=document.querySelector(".split-grip"); if(g) g.setAttribute("aria-valuenow",Math.round(splitW)); }
 function openSplit(tab){
   if(!splitOk()) return;
   tab=TABS.some(([k])=>k===tab)?tab:(S.tab==="morning"?"papers":"morning");
@@ -610,8 +619,16 @@ function openSplit(tab){
   if(!a){a=document.createElement("aside");a.id="split";document.body.appendChild(a);}
   a.innerHTML=`<div class="split-bar"><select id="splittab" aria-label="הלשונית בחלון השני">${TABS.map(([k,l])=>`<option value="${k}" ${k===tab?"selected":""}>${l}</option>`).join("")}</select>
     <button class="ghost" id="splitreload" title="לרענן את החלון השני">רענון</button><span class="grow"></span><button class="ghost" id="splitx">סגירת החלון השני ✕</button></div>
-    <iframe id="splitframe" title="חלון שני" src="${location.pathname}?embed=1&tab=${encodeURIComponent(tab)}&project=${encodeURIComponent(S.project)}"></iframe>`;
-  document.body.classList.add("split"); dispatchEvent(new Event("scroll"));
+    <iframe id="splitframe" title="חלון שני" src="${location.pathname}?embed=1&tab=${encodeURIComponent(tab)}&project=${encodeURIComponent(S.project)}"></iframe>
+    <div class="split-grip" role="separator" aria-orientation="vertical" aria-valuemin="25" aria-valuemax="75" tabindex="0" title="גרירה משנה את רוחב החלונות · לחיצה כפולה מחזירה לחצי-חצי"></div>`;
+  document.body.classList.add("split"); setSplitW(+lsGet("rh.splitw")||50); dispatchEvent(new Event("scroll"));
+  const g=a.querySelector(".split-grip"), keepW=()=>lsSet("rh.splitw",String(Math.round(splitW)));
+  g.onpointerdown=e=>{ if(e.button!==0) return; e.preventDefault(); g.setPointerCapture(e.pointerId); document.body.classList.add("split-drag");
+    const mv=ev=>setSplitW(ev.clientX/innerWidth*100);
+    const up=()=>{g.removeEventListener("pointermove",mv);g.removeEventListener("pointerup",up);document.body.classList.remove("split-drag");keepW();};
+    g.addEventListener("pointermove",mv); g.addEventListener("pointerup",up); };
+  g.ondblclick=()=>{setSplitW(50);keepW();};
+  g.onkeydown=e=>{const d=e.key==="ArrowRight"?5:e.key==="ArrowLeft"?-5:0; if(!d) return; e.preventDefault(); setSplitW(splitW+d); keepW();};
   $("#splittab").onchange=e=>openSplit(e.target.value);
   $("#splitreload").onclick=()=>{const fr=$("#splitframe");fr.src=fr.src;};
   $("#splitx").onclick=closeSplit;
