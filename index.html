@@ -34,6 +34,8 @@
   .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
   .pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:var(--bad-soft);color:var(--bad)}
   .pill.gray{background:#eee;color:#555}
+  .pill.teal{background:#e0f2f1;color:#1f6f6a} .pill.vio{background:#efe8f7;color:#6a3d9a} .pill.rose{background:#fbe8f0;color:#a03a6a}
+  .pill.yel{background:#fbf6d2;color:#6f5c00} .pill.low{background:#f6f6f6;color:#999}
   button,.btn{text-decoration:none;display:inline-block;font:inherit;background:var(--accent);color:#fff;border:0;border-radius:8px;padding:7px 14px;cursor:pointer}
   button.sec{background:#fff;color:var(--accent);border:1px solid var(--accent)}
   button.ghost{background:transparent;color:var(--muted);padding:4px 8px;white-space:nowrap}
@@ -57,6 +59,11 @@
   .th-f.ty-acc{background:var(--accent-soft);color:var(--accent);border-color:var(--accent);font-weight:600}
   .th-f.ty-ok{background:var(--ok-soft);color:var(--ok);border-color:var(--ok);font-weight:600}
   .th-f.pr-gray{background:#eee;color:#555;font-weight:600}
+  .th-f.ty-teal{background:#e0f2f1;color:#1f6f6a;border-color:#1f6f6a;font-weight:600}
+  .th-f.ty-vio{background:#efe8f7;color:#6a3d9a;border-color:#6a3d9a;font-weight:600}
+  .th-f.ty-rose{background:#fbe8f0;color:#a03a6a;border-color:#a03a6a;font-weight:600}
+  .th-f.pr-yel{background:#fbf6d2;color:#6f5c00;border-color:#6f5c00;font-weight:600}
+  .th-f.pr-low{background:#f6f6f6;color:#999;font-weight:600}
   .th-f:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
   .add-task{background:#faf9f7;border:1px solid var(--line);border-radius:10px;padding:12px;margin:4px 0 14px}
   .row-nav{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
@@ -860,7 +867,7 @@ async function reopen(i){
   if(i.kind==="analysis"){const a=i.paper.analyses.find(x=>x.id===i.aid);a.status="open";a.done_at=null;addHistory(i.paper,`ניתוח נפתח מחדש: ${a.name}`);await savePaper(i.paper);return itemKey({...i,done:false});}
   return null;
 }
-function itemType(i){return `<span class="pill ${i.type==="מרפאה"?"warn":i.type==="ניתוח"?"":i.type==="כתיבה"?"ok":"gray"}">${esc(i.type)}</span>`;}
+function itemType(i){return `<span class="pill ${(TY_COL[i.type]||["gray"])[0]}">${esc(i.type)}</span>`;}
 function doneBtn(i,attr){
   if(!i.done) return `<button class="done-btn" ${attr} title="לחיצה מסמנת את המשימה כבוצעה">לסמן כבוצע</button>`;
   return i.kind==="next"?`<span class="done-btn is-done" title="הצעד נרשם בהיסטוריה של המאמר">✓ בוצע</span>`
@@ -927,8 +934,11 @@ function bindStats(){
   });
 }
 /* צבעי עדיפות וסוג, כמו בטבלה */
-const tyCls=v=>v===""?"":v==="מרפאה"?"pr-warn":v==="ניתוח"?"ty-acc":v==="כתיבה"?"ty-ok":"pr-gray";
-const prCls=v=>v===""?"":(+v>=5?"pr-bad":+v>=4?"pr-warn":"pr-gray");
+// one color per work type and per priority (the pill in lists and the filter/select use the same colors)
+const TY_COL={"מרפאה":["warn","pr-warn"],"ניתוח":["","ty-acc"],"כתיבה":["ok","ty-ok"],"נתונים":["teal","ty-teal"],"הגשה":["vio","ty-vio"],"תכנון":["rose","ty-rose"]};
+const PR_COL={5:["bad","pr-bad"],4:["warn","pr-warn"],3:["yel","pr-yel"],2:["gray","pr-gray"],1:["low","pr-low"]};
+const tyCls=v=>v===""?"":(TY_COL[v]||["gray","pr-gray"])[1];
+const prCls=v=>v===""?"":(PR_COL[Math.min(5,Math.max(1,Math.round(+v)||3))])[1];
 /* כרטיס משימה: פרטים, עריכה, סימון כבוצע או פתיחה מחדש, ביטול */
 function openTask(id){
   if(window.focusCard&&focusCard("task:"+id)) return;
@@ -1064,7 +1074,7 @@ function renderMorning(){
 const short=t=>t.length>48?t.slice(0,46)+"…":t;
 /* כפתור מאמר: שם קצר, הכותרת המלאה בריחוף */
 const paperChip=p=>`<button type="button" class="chip" data-open="${esc(p.id)}" title="${esc(p.title)}">${esc(p.short||(p.title.length>34?p.title.slice(0,32)+"…":p.title))}</button>`;
-function prBadge(pr){const n=Math.round(pr);return `<span class="pill ${n>=5?"bad":n>=4?"warn":"gray"}">${n}</span>`;}
+function prBadge(pr){const n=Math.min(5,Math.max(1,Math.round(pr)));return `<span class="pill ${PR_COL[n][0]}">${n}</span>`;}
 function miniStages(n){return `<span class="mini" title="שלב ${n}: ${esc(stageOf(n).name)}">${S.stages.map(s=>`<i class="${s.n<n?"d":s.n===n?"c":""}"></i>`).join("")}</span>`;}
 function bindOpen(){document.querySelectorAll("[data-open]").forEach(a=>a.onclick=e=>{e.preventDefault();openPaper(a.dataset.open);});}
 
